@@ -3,9 +3,9 @@
 
 Documents here:
 
-  - Start with [10Gbs-debian-install-on-supermicro.md](docs/10Gbs-debian-install-on-supermicro.md)
-  - Continue with [influxdb-and-fastnetmon.md](docs/influxdb-and-fastnetmon.md)
-  - And see [README](../src/README.md) last for installation of the fastnetmon notification script.
+  - Installation of [10Gb drivers on the SuperMicro](10Gbs-debian-install-on-supermicro.md)
+  - Installation of [fastnetmon and influxdb](influxdb-and-fastnetmon.md)
+  - Installation of the [fastnetmon notification script](../src/README.md)
 
 # Docs - where to put what
 
