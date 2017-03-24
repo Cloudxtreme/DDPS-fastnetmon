@@ -21,6 +21,7 @@ specific language governing permissions and limitations under the License.
 
 At least the following other licences apply:
 
+  - [pavel-odintsov/fastnetmon](https://github.com/pavel-odintsov/fastnetmon/blob/master/LICENSE) is licensed under the - GNU General Public License v2.0
   - [PostgreSQL](https://www.postgresql.org/about/licence/) - essential an BSD license
   - [perl](https://dev.perl.org/licenses/) which also covers the used perl modules. Each license
     be found on [http://search.cpan.org](http://search.cpan.org).
