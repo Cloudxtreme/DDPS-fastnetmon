@@ -1,0 +1,34 @@
+/*
+From https://code.visualstudio.com/Docs/customization/userandworkspace
+VS Code provides two different scopes for settings:
+
+  - User these settings apply globally to any instance of VS Code you open
+  - Workspace these settings are stored inside your workspace in a .vscode
+	folder and only apply when the workspace is opened. Settings defined on
+	this scope override the user scope.
+*/
+
+// Place your settings in this file to overwrite the default settings
+{
+    "markdown.styles": [
+	"file:///usr/local/etc/i2-Book.css"
+]
+	"editor.lineNumbers": "off",
+// there might be other custom settings you have in this file.
+	"theme": "vs gerane-Theme-Xcodedefault-themes-Xcode_default-tmTheme",
+	"editor.wrappingColumn": 0
+	"files.exclude": {
+		"**/.vscode":   true
+		"**/bog.epub":   true
+		"**/bog.pdf":   true
+		"**/bog.html":   true
+		"**/coverpage.pdf":   true
+		"**/A5-coverpage.pdf":   true
+		"**/._*":   true
+		"**/*.bak": true
+		"**/*.html": { "when": "$(basename).md"}
+		"**/*.pdf":  { "when": "$(basename).md"}
+		"**/*.html": { "when": "$(basename).md"}
+		"**/*.epub": { "when": "$(basename).md"}
+	}
+}

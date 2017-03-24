@@ -1,0 +1,42 @@
+#
+# Makefile for /opt/i2dps
+#
+
+PREFIX	= /opt/i2dps
+BINDIR	= $(PREFIX)/bin
+ETCDIR	= $(PREFIX)/etc
+DATADIR	= $(PREFIX)/data
+TMPDIR	= $(PREFIX)/tmp
+SRCDIR	= $(PREFIX)/src
+
+INSTALL	= $(SRCDIR)/install-sh
+UID		= root
+GID		= root
+
+etcfiles = fnmrc fnm2db.ini
+binfiles = fnm2db mkdata.pl
+
+all: bin etc
+
+bin: $(binfiles)
+	for bin in $(binfiles) ; do							\
+		$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $$bin $(BINDIR)/$(bin) ;	\
+	done
+
+etc: $(etcfiles)
+	for etc in $(etcfiles) ; do							\
+		$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $$etc $(ETCDIR)/$(bin) ;	\
+	done
+
+init.d:
+	$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) fnmrc /etc/init.d/
+	sudo update-rc.d fnmrc defaults
+	sudo systemctl enable fnmrc
+	sudo systemctl start fnmrc
+	sudo systemctl status fnmrc
+
+md:
+	# carefull: here be dragons! You cannot use the same $ in _shell_ and in Makefile ...
+	sed '/#++/,/#--/!d; s/.*++$$//; s/^#//; s/^[\t ]//; s/.*--$$//; s/^[\t ]#/#/' < fnm2db
+
+.SILENT:
