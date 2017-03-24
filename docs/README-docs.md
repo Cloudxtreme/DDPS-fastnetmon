@@ -1,10 +1,12 @@
 
 # Installation of DDPS fastnetmon
 
+TODO: change text from specific with IP addresses to something more generic.
+
 Documents here:
 
-  - Installation of [10Gb drivers on the SuperMicro](10Gbs-debian-install-on-supermicro.md)
-  - Installation of [fastnetmon and influxdb](influxdb-and-fastnetmon.md)
+  - Installation of [10Gb drivers, fastnetmon and influxdb on the SuperMicro](10Gbs-debian-install-on-supermicro.md)
+  - Testing and using [influxdb](influxdb-and-fastnetmon.md)
   - Installation of the [fastnetmon notification script](../src/README.md)
 
 # Docs - where to put what
