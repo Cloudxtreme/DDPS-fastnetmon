@@ -61,9 +61,16 @@ HFILES		= i2dps.h version.h license.h
 PRODINI		= fnm2db.ini
 TESTINI		= test.ini
 
-# make with
-# ssh-keygen -N '' -t ED25519 -b 8192 -f /tmp/ssh/id_rsa
-KEYS		= ssh/id_rsa ssh/id_rsa.pub
+# apt-get -y install libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl
+# dpkg-query -L ... select ramdon file
+libnet-openssh-compat-perl	= /usr/share/perl5/Net/OpenSSH/Compat.pm
+libnet-openssh-compat-perl	= /usr/share/perl5/Net/OpenSSH/Compat/SSH2/Constants.pm
+libnet-ssh2-perl			= /usr/lib/x86_64-linux-gnu/perl5/5.20/Net/SSH2.pm
+
+debdepnd					= $(libnet-openssh-compat-perl) $(libnet-openssh-compat-perl) $(libnet-ssh2-perl)
+
+PUBKEY		= $(ETCDIR)/ssh/id_ed25519.pub
+PRIKEY		= $(ETCDIR)/ssh/id_ed25519
 
 prog		= fnm2db
 target		= $(BINDIR)/fnm2db
@@ -71,7 +78,11 @@ target		= $(BINDIR)/fnm2db
 initrc		= $(INITDIR)/$(RC)
 dbini		= $(ETCDIR)/$(PRODINI)
 
-default:	$(prog)
+# for comment in ssh keys only
+uuid := $(shell ifconfig |sed '/HWaddr/!d; s/.*HWaddr //; s/[[:blank:]]//g; q')
+fqdn := $(shell hostname -f )
+
+default:	$(prog) $(debdepnd)
 
 # perl-version - mimic c version: add version information, set mode and print version. Do not install
 $(prog):	hostcheck fnm2db.pl version.pm
@@ -80,7 +91,7 @@ $(prog):	hostcheck fnm2db.pl version.pm
 			@chmod 555 fnm2db
 			./$(prog) -V
 
-install:	hostcheck $(target) $(initrc) $(dbini) $(sysinit)
+install:	hostcheck $(target) $(initrc) $(dbini) $(sysinit) $(PUBKEY)
 			$(MAKE) dirs
 
 run:		$(target) $(initrc) $(dbini)
@@ -91,13 +102,17 @@ test:		$(prog) $(TESTINI)
 			( sleep 10; touch `sed '/shutdown/!d; s/.*=[\t ]*//' test.ini` ) &
 			$(SRCDIR)/$(prog) -v -s 2 -f $(TESTINI)
 
+$(PUBKEY):
+			$(MAKE) dirs
+			ssh-keygen -C "root@$(uuid)-$(fqdn)" -N '' -t ED25519 -b 16384 -f $(PRIKEY)
+
 hostcheck:
-	@if [ "`hostname -f`" != "`echo $(TARGETHOST) | sed 's/.*@//'`" ]; then					\
-		echo "make should not be executed on the wrong host ... ";							\
-		echo "hostname = `hostname` expected `echo $(TARGETHOST) | sed 's/.*@//'`, bye ";	\
-		exit 1;																				\
-	fi
-	chmod 555 $(INSTALL) $(SRCTOMAN)
+			@if [ "`hostname -f`" != "`echo $(TARGETHOST) | sed 's/.*@//'`" ]; then					\
+				echo "make should not be executed on the wrong host ... ";							\
+				echo "hostname = `hostname` expected `echo $(TARGETHOST) | sed 's/.*@//'`, bye ";	\
+				exit 1;																				\
+			fi
+			chmod 555 $(INSTALL) $(SRCTOMAN)
 
 # Unused article on how to Write Linux Init Scripts Based on LSB Init Standard:
 # http://www.thegeekstuff.com/2012/03/lsbinit-script/
@@ -113,12 +128,6 @@ dirs:
 			chown -R $(UID):$(GID) $(PREFIX)
 			chmod 700 $(PREFIX)/etc/ssh/
 
-# Use the same ssh keys everywhere and keep security to OpenVPN
-keys:
-			$(MAKE) dirs
-			$(INSTALL) -c -m 0700 -o $(UID) -g $(GID) $(KEYS) $(PREFIX)/etc/ssh/
-
-
 $(initrc):	$(RC)
 			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
 
@@ -132,7 +141,16 @@ $(dbini):	$(PRODINI)
 # Dependencies
 #
 install-modules:
-	apt-get -y install libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl
+	apt-get -y install libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl libnet-sftp-foreign-perl
+
+$(libnet-openssh-compat-perl-compat.pm):
+	apt-get -y install libnet-openssh-compat-perl
+
+$(libnet-openssh-compat-perl-compat.pm):
+	apt-get -y install libnet-openssh-compat-perl
+
+$(libnet-ssh2-perl-ssh2.pm):
+	t-get -y install libnet-ssh2-perl
 
 .SUFFIXES:
 

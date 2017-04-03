@@ -1,27 +1,4 @@
-11:08:05 (23/03) Begin
-11:08:05 (23/03) called as: ./remote.sh -v push
-11:08:05 (23/03) Environment:
-11:08:05 (23/03) git_sha:        '7ab71981dfb2f1369a64f68be5c5f2db68112c9a'
-11:08:05 (23/03) build_date:     '2017-03-23 11:08'
-11:08:05 (23/03) TARGETHOST:     'root@fastnetmon2.deic.dk'
-11:08:05 (23/03) UPLOADDIR:      '/opt/i2dps/src/'
-11:08:05 (23/03) EXCLUDE_FILE:   'rsync_exclude.txt'
-11:08:05 (23/03) TMPDIR:         '/var/folders/2d/n362xj9148lg_rrsgy61wsjr0008qx/T/'
-11:08:05 (23/03) RRSYNC:         '/usr/bin/rsync'
-11:08:05 (23/03) LRSYNC:         '/usr/bin/rsync'
-11:08:05 (23/03) RSYNC_ARGS:     '-avzH --exclude-from=rsync_exclude.txt'
-11:08:05 (23/03) SSH_ARGS:       '-Tq -o LogLevel=error'
-11:08:05 (23/03) SSH:            '/usr/bin/ssh'
-11:08:05 (23/03) SRCDIR:         '.'
-11:08:05 (23/03) PROJDIR:        '../../DDPS-fastetmon'
-11:08:05 (23/03) MYDIR:          '/Users/uninth/src/tmp/DDPS-fastetmon/src'
-11:08:05 (23/03) command: /usr/bin/rsync -avzH --exclude-from=rsync_exclude.txt --rsync-path /usr/bin/rsync /Users/uninth/src/tmp/DDPS-fastetmon/src/ root@fastnetmon2.deic.dk:/opt/i2dps/src//
-11:08:05 (23/03) building file list ... done
-11:08:05 (23/03) ./
-11:08:05 (23/03) .source_info
-11:08:05 (23/03) Makefile
-11:08:05 (23/03) ssh/
-
-11:08:05 (23/03) sent 928 bytes  received 190 bytes  2236.00 bytes/sec
-11:08:05 (23/03) total size is 41863  speedup is 37.44
-11:08:05 (23/03) done
+16:46:24 (03/04) Begin
+16:46:24 (03/04) called as: ./remote.sh -d -g -v make
+16:46:24 (03/04) making developer version files ... 
+16:46:24 (03/04) exec git commands in /Users/uninth/ownsky/src/github/DDPS-fastetmon:

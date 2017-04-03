@@ -41,7 +41,7 @@
 #
 #         sudo apt-get install libnet-openssh-compat-perl
 #         apt-get install libnet-openssh-compat-perl
-#         apt-get -y install libnet-ssh2-perl libnet-sftp-foreign-perl
+#         apt-get -y install libnet-ssh2-perl
 #
 #--
 
@@ -52,7 +52,6 @@ sub mydie(@);
 sub parse_ip($);
 #sub parse_ip6($);
 sub parse_v4(@);
-sub randstr(@);
 
 #
 # Requirements
@@ -60,12 +59,10 @@ sub randstr(@);
 use strict;
 use warnings;
 use sigtrap qw(die normal-signals);
-use File::Temp qw(tempfile);
 
 use Sys::Syslog;		# only needed for logit
 use POSIX;				# only needed for logit
 use Net::SSH2;			# ssh v2 access to postgres db
-use Net::SFTP::Foreign;
 
 #
 # Global vars
@@ -73,7 +70,7 @@ use Net::SFTP::Foreign;
 my $usage = "\n$0	client_ip_as_string data_direction pps action\n";
 
 # tcpdump
-my ($date, $time, $src_sport, $andgt, $dst_dport, $protocol, $frag, $packets, $length, $icmp_type, $icmp_code, $flags, $str, $ttl, $ratio, $dscp);
+my ($date, $time, $src_sport, $andgt, $dst_dport, $protocol, $frag, $packets, $size, $str, $ttl, $ratio);
 my ($src, $sport, $dst, $dport, $ver, $ip, $port);
 
 # fastnetmon specific
@@ -107,9 +104,7 @@ my $inicfg	= "/opt/i2dps/etc/fnm2db.ini";
 # included from version.pm
 # my $build_date = "2017-02-16 15:16";
 # my $build_git_sha = "0b5fc18ea3bceb59ca4baaa261089f2490674138";
-my $version = "1.0-2";
-my $build_date = "2017-03-20 11:50";
-my $build_git_sha = "f453673f0c118a048624b81f779965be50f278d5";
+#INCLUDE_VERSION_PM
 my $show_version = 0;
 
 ################################################################################
@@ -140,8 +135,6 @@ sub main(@) {
 	my $pps					=	$ARGV[2];	# number
 	my $action				=	$ARGV[3];	# ban | unban | attack_details
 
-	my $error_string		= "";
-
 	logit ("start: $0 @ARGV");
 
 	if(!defined $client_ip_as_string or !defined $data_direction or !defined $pps or !defined $action)
@@ -159,50 +152,9 @@ sub main(@) {
 	# check client_ip_as_string is ipv4
 	($ver, $ip, $port) = parse_v4($client_ip_as_string) or mydie "'$client_ip_as_string' not an address\n";
 
-	# read prefs from ini file
-	open my $fh, '<', $inicfg or mydie "Could not open '$inicfg' $!";
-	my $section;
-	my %data;
+	# check other args
+	# ...
 
-	while (my $line = <$fh>) {
-		if ($line =~ /^\s*#/) {
-			next;        # skip comments
-		}
-		if ($line =~ /^\s*$/) {
-			next;    # skip empty lines
-		}
-
-		if ($line =~ /^\[(.*)\]\s*$/) {
-			$section = $1;
-			next;
-		}
-
-		if ($line =~ /^([^=]+?)\s*=\s*(.*?)\s*$/) {
-			my ($field, $value) = ($1, $2);
-			if (not defined $section) {
-				logit("Error in '$inicfg': Line outside of seciton '$line'");
-				next;
-			}
-			$data{$section}{$field} = $value;
-		}
-	}
-
-	my $uuid	= $data{'globals'}{'uuid'};
-	my $server	= $data{'update'}{'server'};
-	my $user	= $data{'update'}{'user'};
-	my $pubkey	= $data{'update'}{'pubkey'};
-	my $privkey	= $data{'update'}{'privkey'};
-	my $passwd	= $data{'update'}{'passwd'};
-	my $sftp_timeout = $data{'update'}{'sftp_timeout'};
-
-	my $mode	= $data{'globals'}{'mode'};
-	my $blocktime = $data{'globals'}{'blocktime'};
-	my $customernetworkid = $data{'globals'}{'customernetworkid'};
-	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
-
-	close ($fh);
-
-	# process tcpdump
 	while (<STDIN>)
 	{
 		chomp $_;
@@ -257,150 +209,174 @@ sub main(@) {
 		if ($_ =~ /^Average packet size for incoming traffic:\s*(\d).*$/)	{ $Average_packet_size_for_incoming_traffic = $1; };
 		if ($_ =~ /^Average packet size for outgoing traffic:\s*(\d).*$/)	{ $Average_packet_size_for_outgoing_traffic = $1; };
 
-		# tcpdump: I'm missing a lot of information here
+		# tcpdump ...
 		next if (! />.*$client_ip_as_string/);
 
+		# 2016-06-08 16:18:53.299994 130.225.245.210:34859 > 130.226.136.242:5001 protocol: udp frag: 0  packets: 1 size: 1512 bytes ttl: 0 sample ratio: 1
 		if ($_ =~ /.*>.*$client_ip_as_string.*protocol:.*bytes.*ttl:.*/)
 		{
-			# example output
-			# 2016-06-08 16:18:53.299994 130.225.245.210:34859 > 130.226.136.242:5001 protocol: udp frag: 0  packets: 1 size: 1512 bytes ttl: 0 sample ratio: 1
-			# 2017-03-27 14:47:43.199756   21.30.184.209:14363 > 130.226.136.242:80   protocol: tcp flags: syn frag: 0  packets: 1 size: 60 bytes ttl: 63 sample ratio: 1
-			# 2017-03-27 15:32:03.071697   60.28.184.234:0     > 130.226.136.242:0    protocol: icmp frag: 0  packets: 1 size: 60 bytes ttl: 63 sample ratio: 1
-
-			# re-init
-			$dst = $src = $protocol = $sport = $dport = $sport = $icmp_type = $icmp_code = $flags = $length = $ttl = $dscp = "";
-
-			if ($_ =~ /protocol:.*icmp/)
-			{
-				($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $frag, $str, $packets, $str, $length, $str, $str, $ttl, $str, $str, $ratio) =
-				split(' ', $_);
-			} elsif ($_ =~ /protocol:.*tcp/)
-			{
-				($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $flags, $str, $frag, $str, $packets, $str, $length, $str, $str, $ttl, $str, $str, $ratio) = 
-				split(' ', $_);
-
-			} elsif ($_ =~ /protocol:.*udp/)
-			{
-				($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $frag, $str, $packets, $str, $length, $str, $str, $ttl, $str, $str, $ratio) = 
-				split(' ', $_);
-			} else
-			{
-				print "unknown IP protocol\n"; next;
-			}
+			($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $frag, $str, $packets, $str, $size, $str, $str, $ttl, $str, $str, $ratio) = 
+			split(' ', $_);
 
 			($src, $sport) = split(':', $src_sport);
 			($dst, $dport) = split(':', $dst_dport);
 
-			# Rules: networkid,uuid,blocktime,date,time,1,2,3,4,5,6,7,8,9,10,11,12
-			# Type 1 - Destination Prefix
-			# Type 2 - Source Prefix
-			# Type 3 - IP Protocol
-			# Type 4 – Source or Destination Port
-			# Type 5 – Destination Port
-			# Type 6 - Source Port
-			# Type 7 – ICMP Type
-			# Type 8 – ICMP Code
-			# Type 9 - TCP flags
-			# Type 10 - Packet length
-			# Type 11 – DSCP
-			# Type 12 - Fragment Encoding
-
-			# Fail-safe: only do something if everything seems ok
-			# silently drop lines which does not have all info
-			next if (!defined $src or !defined $sport or !defined $dst or !defined $dport or !defined $protocol or !defined $frag or !defined $packets or !defined $length or !defined $ttl or !defined $ratio or !defined $pps);
-
-			# not an address or portnumber
-			($ver, $ip, $port) = parse_v4($src, $sport) or next;
-			($ver, $ip, $port) = parse_v4($dst, $dport) or next;
-
-			# not numbers
-			($ttl	=~ /[0-9]*/) or next;
-			($ratio	=~ /[0-9]*/) or next;
-			($pps	=~ /[0-9]*/) or next;
-
-			# clean up and assign default values
-			$sport		= $sport		? $sport		: 0;
-			$dport		= $dport		? $dport		: 0;
-			$sport		= $sport		? $sport		: 0;
-			$icmp_type	= $icmp_type	? $icmp_type	: 0;
-			$icmp_code	= $icmp_code	? $icmp_code	: 0;
-			$flags		= $flags		? $flags		: 0;
-			#$length	= $length		? $length		: 0;
-			#$ttl		= $ttl			? $ttl			: 0;
-			$dscp		= $dscp			? $dscp			: 0;
-			$frag		= $frag			? $frag			: 0;
-
-#			print<<EOF;
-#
-# customernetworkid:  	$customernetworkid
-# uuid:  			$uuid
-# blocktime: 		$blocktime
-# dst: 			$dst
-# src:			$src
-# protocol:		$protocol
-# sport:			$sport
-# dport:			$dport
-# sport:			$sport
-# icmp_type:		$icmp_type
-# icmp_code:		$icmp_code
-# flags:			$flags
-# length:			$length
-# ttl:			$ttl
-# dscp:			$dscp
-# frag:			$frag
-# 
-# EOF
-
-			print $tmp_fh "$customernetworkid;$uuid;$blocktime;$dst;$src;$protocol;$sport;$dport;$sport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
 		else
 		{
 			# non-tcpdump line ignored
 			#: print "hmm :=-> $_\n";
-			#logit("unused input: $_");
+			logit("unused input: $_");
 		}
 	}
-	print $tmp_fh "last-line\n";
-	close($tmp_fh)||mydie "close $tmp_fh failed: $!";
-	logit("printed new rules to $tmp_fh ... ");
 
-	my $sftp=Net::SFTP::Foreign->new(
-		host => $server,
-		user => $user,
-		timeout => $sftp_timeout,
-		autodie => 0,
-		more => [
-			"-oIdentityFile=$privkey",
-			'-oPreferredAuthentications=publickey',
-			], );
+	#
+	# Fail-safe: only do something if everything seems ok
+	#
+	if (!defined $src or !defined $sport or !defined $dst or !defined $dport or !defined $protocol or !defined $frag or !defined $packets or !defined $size or !defined $ttl or !defined $ratio or !defined $pps)
+	{
+		logit("not all parameters defined:");
+		#TODO: fix næste linie
+		$src = $src ? $src : "unknown";
+		$sport = $sport ? $sport : "unknown";
+		$dst = $dst ? $dst : "unknown";
+		$dport = $dport ? $dport : "unknown";
+		$protocol = $protocol ? $protocol : "unknown";
+		$dport = $dport ? $dport : "unknown";
+		$size = $size ? $size : "unknown";
+		$packets = $packets ? $packets : "unknown";
+		$ttl = $ttl ? $ttl : "unknown";
+		$ratio = $ratio ? $ratio : "unknown";
+		$pps = $pps ? $pps : "unknown";
 
-	if ($sftp->error ne 0)
-	{
-		logit("Unable to establish SFTP connection: $sftp->status");
-		$sftp->disconnect;
+		logit( "src=$src sport=$sport dst=$dst dport=$dport proto=$protocol port=$dport size=$size packets=$packets ttl=$ttl ratio=$ratio pps=$pps");
+		exit(0);
 	}
-	else
-	{
-		my $now = time();
-		my $remote_file = "/upload/newrules-${uuid}-${now}-" . randstr(8, 'a'..'z', 0..9) . ".dat";
-		logit("uploading $tmp_fh as $remote_file");
-		$sftp->put("$tmp_fh", "$remote_file");
-		if ($sftp->error ne 0)
-		{
-			$error_string = $sftp->error;
-			logit("error:  put $user\@$server:'$remote_file' failed: $error_string");
-			$error_string = $sftp->status;
-			logit("status: put $user\@$server:'$remote_file' failed: $error_string");
-			logit("leaving local file '$tmp_fh'");
+
+	($ver, $ip, $port) = parse_v4($src, $sport) or mydie("'$src' not an address / port");
+	($ver, $ip, $port) = parse_v4($dst, $dport) or mydie("'$dst' not an address / port");
+
+	($ttl	=~ /[0-9]*/) or mydie("'$ttl' not a number");
+	($ratio	=~ /[0-9]*/) or mydie("'$ratio' not a number");
+	($pps	=~ /[0-9]*/) or mydie("'$pps' not a number");
+
+	# TODO
+	# proto en proto fra /etc/protocols
+
+	open my $fh, '<', $inicfg or mydie "Could not open '$inicfg' $!";
+	my $section;
+	my %data;
+
+	while (my $line = <$fh>) {
+		if ($line =~ /^\s*#/) {
+			next;        # skip comments
 		}
-		else
-		{
-			logit("upload ok removing local file '$tmp_fh'");
-			unlink($tmp_fh);
+		if ($line =~ /^\s*$/) {
+			next;    # skip empty lines
 		}
-		$sftp->disconnect;
+
+		if ($line =~ /^\[(.*)\]\s*$/) {
+			$section = $1;
+			next;
+		}
+
+		if ($line =~ /^([^=]+?)\s*=\s*(.*?)\s*$/) {
+			my ($field, $value) = ($1, $2);
+			if (not defined $section) {
+				logit("Error in '$inicfg': Line outside of seciton '$line'");
+				next;
+			}
+			$data{$section}{$field} = $value;
+		}
 	}
-	exit(0);
+
+	# logit("globals/mode = $data{'globals'}{'mode'}");
+	# logit("globals/blocktime = $data{'globals'}{'blocktime'}");
+
+	# logit("globals/customer = $data{'globals'}{'customer'}");
+	# logit("globals/uuid = $data{'globals'}{'uuid'}");
+
+	my $uuid	= $data{'globals'}{'uuid'} . "-" . $data{'globals'}{'customer'};
+	my $server	= $data{'update'}{'server'};
+	my $user	= $data{'update'}{'user'};
+	my $pubkey	= $data{'update'}{'pubkey'};
+	my $privkey	= $data{'update'}{'privkey'};
+	my $passwd	= $data{'update'}{'passwd'};
+
+	my $mode	= $data{'globals'}{'mode'};
+	my $blocktime = $data{'globals'}{'blocktime'};
+
+	close ($fh);
+
+	# seems ok to procede - for now just print findings
+	logit "uuid=$uuid dst=$dst src=$src proto=$protocol dport=$dport sport=$sport port=$dport size=$size ttl=$ttl ratio=$ratio pps=$pps mode=$mode blocktime=$blocktime\n";
+
+	# save ^ for later - e.g 'touch $src ... while we still run ExaBGP: cleanup later in databse is more easy
+
+	#  v   - Type 1 - Destination Prefix
+	#  v   - Type 2 - Source Prefix
+	#  v   - Type 3 - IP Protocol
+	#  v   - Type 4 – Source or Destination Port
+	#  v   - Type 5 – Destination Port
+	#  v   - Type 6 - Source Port
+	#  x   - Type 7 – ICMP Type
+	#  x   - Type 8 – ICMP Code
+	#  ?   - Type 9 - TCP flags
+	#  v   - Type 10 - Packet length
+	#  x   - Type 11 – DSCP
+	#  ?   - Type 12 - Fragment Encoding
+
+	my $cmd = <<"END_MESSAGE";
+
+cat << EOF | psql -h localhost -U postgres -v ON_ERROR_STOP=1 -w -d netflow
+insert into flow.flowspecrules(
+    flowspecruleid,         customernetworkid,  rule_name,      administratorid,    direction,      validfrom,      validto,
+    fastnetmoninstanceid,   isactivated,        isexpired,      destinationprefix,  sourceprefix,   ipprotocol,     srcordestport,
+    destinationport,         sourceport,        icmptype,       icmpcode,           tcpflags,       packetlength,   dscp,
+    fragmentencoding
+)
+values
+(
+    ( select coalesce(max(flowspecruleid),0)+1 from flow.flowspecrules),
+    1, -- skal rettes
+    '$uuid',
+    2,
+    'in',
+    now(),
+    now()+interval '$blocktime minutes',
+    1,      false,  false,  '$dst', '$src', '$protocol',   '$dport',
+    '$dport', '$sport', null,   null,   null,   '$size',      null,
+    null
+);
+EOF
+case `echo \$?` in
+  0)  echo "OK"
+  ;;
+  *)  echo "FAIL"
+  ;;
+esac
+
+END_MESSAGE
+
+	my $ssh2 = Net::SSH2->new();
+	$ssh2->connect("$server") or mydie $!;
+
+	# auth_publickey ( username, public key, private key [, password ] )
+	my $auth = $ssh2->auth_publickey(
+		$user, $pubkey, $privkey, $passwd
+	);
+
+	my $chan2 = $ssh2->channel();
+	$chan2->blocking(1);
+
+	# send to postgres sort-of
+	$chan2->exec("$cmd\n");
+
+	print "$_" while <$chan2>;
+
+	$chan2->close;
+
+	#print "$cmd\n";
 }
 
 sub parse_v4(@) {
@@ -487,6 +463,3 @@ sub mydie(@)
 	logit(@_);
 	exit(0);
 }
-
-sub randstr(@) { join'', @_[ map{ rand @_ } 1 .. shift ] }
-
