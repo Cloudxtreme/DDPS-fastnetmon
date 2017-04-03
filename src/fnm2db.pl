@@ -104,12 +104,8 @@ my $verbose = 0;
 my $logfile = "/opt/i2dps/tmp/" . "logfile.txt";
 my $inicfg	= "/opt/i2dps/etc/fnm2db.ini";
 
-# included from version.pm
-# my $build_date = "2017-02-16 15:16";
-# my $build_git_sha = "0b5fc18ea3bceb59ca4baaa261089f2490674138";
-my $version = "1.0-2";
-my $build_date = "2017-03-20 11:50";
-my $build_git_sha = "f453673f0c118a048624b81f779965be50f278d5";
+#INCLUDE_VERSION_PM
+
 my $show_version = 0;
 
 ################################################################################
