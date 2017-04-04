@@ -46,12 +46,14 @@ function usage()
 	-n: dont actually do anything
 	-v: be verbose
 	push:   push source from `pwd` to ${TARGETHOST}:${UPLOADDIR}
-	clean:	push source from `pwd` to ${TARGETHOST}:${UPLOADDIR} AND DELETE EVERYTHING ELSE ON ${TARGETHOST}:${UPLOADDIR}
+	clean:	push source from `pwd` to ${TARGETHOST}:${UPLOADDIR}
 	fetch:  retch source from ${TARGETHOST}:${UPLOADDIR} to ${TMPDIR}
 	make:  push (rsync) then ssh 'chdir && make what-ever'
 	        The argument to make should be passed to make, e.g.:
 	$0 make test
 	$0 make target
+
+	Notice that 'clean' will delete everything on ${TARGETHOST}:${UPLOADDIR}
 
 	TARGETHOST:	${TARGETHOST}
 	UPLOADDIR:	${UPLOADDIR}
@@ -110,7 +112,8 @@ shift `expr $OPTIND - 1`
 for file in ${EXCLUDE_FILE} ${LRSYNC} ${SSH} ${SRCDIR} ${PROJDIR} ${MYDIR} 
 do
 	if ! [ -e $file ]; then
-		echo "ERROR: file / directory $file not found"
+		echo "Cannot find file / directory....: $file"
+		echo "Please change the line .........:`grep $file Makefile` in Makefile"
 		exit 2
 	fi
 done
@@ -302,9 +305,7 @@ exit 0
 #
 # Documentation and  standard disclaimar
 #
-# Copyright (C) 2017 Niels Thomas Haugård
-# DeIC.dk | i2.dk
-# http://deic.dk | http://www.i2.dk 
+# Copyright (C) 2010 Niels Thomas Haugård, thomas@haugaard.net
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -344,7 +345,7 @@ exit 0
 # .TP
 #	\fCproject_template/src/Makefile\fR
 #	Default makefile with extra parameters at the top. Change to your
-#	harts desere but leave the top with the correct parameters.
+#	heart desere but leave the top with the correct parameters.
 # .TP
 #	\fCproject_template/src/remote.sh\fR
 #	This script.

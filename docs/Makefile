@@ -16,7 +16,7 @@
 #	- Change author to your name and do ``make document.html and document.pdf``.
 #
 #	- If you have more than one document then go ``make document.mmd`` first  and
-#	  edit to your harts desire (add files to the file: part). Then run  make for
+#	  edit to your heart desire (add files to the file: part). Then run  make for
 #	  the html and pdf versions.
 #
 #	  If the arguments to wkhtmltopdf doesn't fit, then feel free to add your own

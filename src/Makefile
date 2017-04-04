@@ -83,6 +83,7 @@ uuid := $(shell ifconfig |sed '/HWaddr/!d; s/.*HWaddr //; s/[[:blank:]]//g; q')
 fqdn := $(shell hostname -f )
 
 default:	$(prog) $(debdepnd)
+	./rollup.sh tcp
 
 # perl-version - mimic c version: add version information, set mode and print version. Do not install
 $(prog):	hostcheck fnm2db.pl version.pm

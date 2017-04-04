@@ -1,3 +1,4 @@
+data/
 *.BAK
 *.bak
 *.md

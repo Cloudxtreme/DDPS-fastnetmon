@@ -5,15 +5,14 @@
 #++
 # ## Pseudo code for fnm2db
 #
-# ``fnm2db`` is failsafe, and dies silently if args or input is invalid.
-#
-# ``fnm2db`` is triggered when a DDoS attack is detected by _fastnetmon_.
+# ``fnm2db`` is failsafe, and dies silently if args or input is invalid. It
+# is triggered when a DDoS attack is detected by _fastnetmon_.
 #
 # ## Usage:
 #
 # ``fnm2db`` client_ip_as_string data_direction pps action
 #
-#      Rest is read from std-in.
+#      The rest is read from ``stdin``
 #
 # Pseudo code:
 #
@@ -39,9 +38,7 @@
 #```
 #	``fnm2db`` is written in perl, and requires the following packages on Debian GNU/Linux 8:
 #
-#         sudo apt-get install libnet-openssh-compat-perl
-#         apt-get install libnet-openssh-compat-perl
-#         apt-get -y install libnet-ssh2-perl libnet-sftp-foreign-perl
+#         apt-get -y install libnet-openssh-compat-perl libnet-ssh2-perl libnet-sftp-foreign-perl
 #
 #--
 
@@ -197,6 +194,7 @@ sub main(@) {
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
 
 	close ($fh);
+	print $tmp_fh "fnm;1;syn_flood;\n";
 
 	# process tcpdump
 	while (<STDIN>)
@@ -287,6 +285,10 @@ sub main(@) {
 			($src, $sport) = split(':', $src_sport);
 			($dst, $dport) = split(':', $dst_dport);
 
+			# Rule header: type;vesion;attack_info;
+			# type: fnm | ...
+			# version: 1
+			# attack_info: icmp_flood | syn_flood | udp_flood | unknown | ...
 			# Rules: networkid,uuid,blocktime,date,time,1,2,3,4,5,6,7,8,9,10,11,12
 			# Type 1 - Destination Prefix
 			# Type 2 - Source Prefix
@@ -315,16 +317,17 @@ sub main(@) {
 			($pps	=~ /[0-9]*/) or next;
 
 			# clean up and assign default values
-			$sport		= $sport		? $sport		: 0;
-			$dport		= $dport		? $dport		: 0;
-			$sport		= $sport		? $sport		: 0;
-			$icmp_type	= $icmp_type	? $icmp_type	: 0;
-			$icmp_code	= $icmp_code	? $icmp_code	: 0;
-			$flags		= $flags		? $flags		: 0;
-			#$length	= $length		? $length		: 0;
-			#$ttl		= $ttl			? $ttl			: 0;
-			$dscp		= $dscp			? $dscp			: 0;
-			$frag		= $frag			? $frag			: 0;
+			$sport				= $sport		? $sport		: 0;
+			$dport				= $dport		? $dport		: 0;
+			$sport				= $sport		? $sport		: 0;
+			$icmp_type			= $icmp_type	? $icmp_type	: 0;
+			$icmp_code			= $icmp_code	? $icmp_code	: 0;
+			$flags				= $flags		? $flags		: 0;
+			#$length			= $length		? $length		: 0;
+			#$ttl				= $ttl			? $ttl			: 0;
+			$dscp				= $dscp			? $dscp			: 0;
+			$frag				= $frag			? $frag			: 0;
+			$attack_type		= $attack_type	? $attack_type	: 0;
 
 #			print<<EOF;
 #
@@ -346,7 +349,6 @@ sub main(@) {
 # frag:			$frag
 # 
 # EOF
-
 			print $tmp_fh "$customernetworkid;$uuid;$blocktime;$dst;$src;$protocol;$sport;$dport;$sport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
 		else
@@ -486,3 +488,19 @@ sub mydie(@)
 
 sub randstr(@) { join'', @_[ map{ rand @_ } 1 .. shift ] }
 
+
+__DATA__
+
+   Copyright 2017, DeiC, Niels Thomas Haugård
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

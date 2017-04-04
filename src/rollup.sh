@@ -2,7 +2,7 @@
 #
 
 datadir=/opt/i2dps/data
-prog=/opt/i2dps/bin/fnm2db-new.pl
+prog=/opt/i2dps/src/fnm2db
 
 case $1 in
 	icmp)	gunzip -c ${datadir}/icmp.gz |	${prog} 130.226.136.242 incoming 35335 ban
