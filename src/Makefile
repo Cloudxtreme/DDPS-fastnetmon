@@ -151,7 +151,7 @@ $(libnet-openssh-compat-perl-compat.pm):
 	apt-get -y install libnet-openssh-compat-perl
 
 $(libnet-ssh2-perl-ssh2.pm):
-	t-get -y install libnet-ssh2-perl
+	apt-get -y install libnet-ssh2-perl
 
 .SUFFIXES:
 
