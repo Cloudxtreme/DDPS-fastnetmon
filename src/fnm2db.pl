@@ -95,6 +95,7 @@ my (
 	$Average_packet_size_for_outgoing_traffic
 	);
 
+$attack_type = "";
 
 my $verbose = 0;
 
@@ -194,7 +195,8 @@ sub main(@) {
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
 
 	close ($fh);
-	print $tmp_fh "fnm;1;syn_flood;\n";
+
+	my $header_printed = 0;
 
 	# process tcpdump
 	while (<STDIN>)
@@ -250,6 +252,12 @@ sub main(@) {
 		if ($_ =~ /^Average network outgoing pps:\s*(\d).*$/)				{ $Average_network_outgoing_pps = $1; };
 		if ($_ =~ /^Average packet size for incoming traffic:\s*(\d).*$/)	{ $Average_packet_size_for_incoming_traffic = $1; };
 		if ($_ =~ /^Average packet size for outgoing traffic:\s*(\d).*$/)	{ $Average_packet_size_for_outgoing_traffic = $1; };
+
+		if (($header_printed == 0) && ($attack_type ne ''))
+		{
+			print $tmp_fh "head;fnm;1;$attack_type\n";
+			$header_printed = 1;
+		}
 
 		# tcpdump: I'm missing a lot of information here
 		next if (! />.*$client_ip_as_string/);

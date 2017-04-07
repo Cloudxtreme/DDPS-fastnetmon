@@ -1,41 +1,42 @@
-12:14:08 (04/04) Begin
-12:14:08 (04/04) called as: ./remote.sh -v make
-12:14:08 (04/04) Environment:
-12:14:08 (04/04) git_sha:        'ef05a0a8ca6108184427904b9f59c73735923b41'
-12:14:08 (04/04) build_date:     '2017-04-04 12:14'
-12:14:08 (04/04) TARGETHOST:     'root@fastnetmon2.deic.dk'
-12:14:08 (04/04) UPLOADDIR:      '/opt/i2dps/src/'
-12:14:08 (04/04) EXCLUDE_FILE:   'rsync_exclude.txt'
-12:14:08 (04/04) TMPDIR:         '/var/folders/2d/n362xj9148lg_rrsgy61wsjr0008qx/T/'
-12:14:08 (04/04) RRSYNC:         '/usr/bin/rsync'
-12:14:08 (04/04) LRSYNC:         '/usr/bin/rsync'
-12:14:08 (04/04) RSYNC_ARGS:     '-avzH --exclude-from=rsync_exclude.txt'
-12:14:08 (04/04) SSH_ARGS:       '-Tq -o LogLevel=error'
-12:14:08 (04/04) SSH:            '/usr/bin/ssh'
-12:14:08 (04/04) SRCDIR:         '.'
-12:14:08 (04/04) PROJDIR:        '../../DDPS-fastetmon'
-12:14:08 (04/04) MYDIR:          '/Users/uninth/ownsky/src/github/DDPS-fastetmon/src'
-12:14:08 (04/04) rsync files to root@fastnetmon2.deic.dk ... 
-12:14:08 (04/04) command: /usr/bin/rsync -avzH --exclude-from=rsync_exclude.txt --rsync-path /usr/bin/rsync /Users/uninth/ownsky/src/github/DDPS-fastetmon/src/ root@fastnetmon2.deic.dk:/opt/i2dps/src//
-12:14:08 (04/04) building file list ... done
-12:14:08 (04/04) ./
-12:14:08 (04/04) .source_info
+12:23:59 (07/04) Begin
+12:23:59 (07/04) called as: ./remote.sh -v make
+12:23:59 (07/04) Environment:
+12:23:59 (07/04) git_sha:        '354f948a3028c072e70d1b85f2bfccdf5b7c0997'
+12:23:59 (07/04) build_date:     '2017-04-07 12:23'
+12:23:59 (07/04) TARGETHOST:     'root@fastnetmon2.deic.dk'
+12:23:59 (07/04) UPLOADDIR:      '/opt/i2dps/src/'
+12:23:59 (07/04) EXCLUDE_FILE:   'rsync_exclude.txt'
+12:23:59 (07/04) TMPDIR:         '/var/folders/2d/n362xj9148lg_rrsgy61wsjr0008qx/T/'
+12:23:59 (07/04) RRSYNC:         '/usr/bin/rsync'
+12:23:59 (07/04) LRSYNC:         '/usr/bin/rsync'
+12:23:59 (07/04) RSYNC_ARGS:     '-avzH --exclude-from=rsync_exclude.txt'
+12:23:59 (07/04) SSH_ARGS:       '-Tq -o LogLevel=error'
+12:23:59 (07/04) SSH:            '/usr/bin/ssh'
+12:23:59 (07/04) SRCDIR:         '.'
+12:23:59 (07/04) PROJDIR:        '../../DDPS-fastetmon'
+12:23:59 (07/04) MYDIR:          '/Users/uninth/ownsky/src/github/DDPS-fastetmon/src'
+12:23:59 (07/04) rsync files to root@fastnetmon2.deic.dk ... 
+12:23:59 (07/04) command: /usr/bin/rsync -avzH --exclude-from=rsync_exclude.txt --rsync-path /usr/bin/rsync /Users/uninth/ownsky/src/github/DDPS-fastetmon/src/ root@fastnetmon2.deic.dk:/opt/i2dps/src//
+12:23:59 (07/04) building file list ... done
+12:23:59 (07/04) ./
+12:23:59 (07/04) .source_info
+12:23:59 (07/04) fnm2db.pl
 
-12:14:08 (04/04) sent 538 bytes  received 66 bytes  1208.00 bytes/sec
-12:14:08 (04/04) total size is 58723  speedup is 97.22
-12:14:08 (04/04) exec 'make  ' on root@fastnetmon2.deic.dk ... 
+12:23:59 (07/04) sent 755 bytes  received 238 bytes  1986.00 bytes/sec
+12:23:59 (07/04) total size is 58866  speedup is 59.28
+12:23:59 (07/04) exec 'make  ' on root@fastnetmon2.deic.dk ... 
 
-12:14:08 (04/04) The programs included with the Debian GNU/Linux system are free software;
-12:14:08 (04/04) the exact distribution terms for each program are described in the
-12:14:08 (04/04) individual files in /usr/share/doc/*/copyright.
+12:23:59 (07/04) The programs included with the Debian GNU/Linux system are free software;
+12:23:59 (07/04) the exact distribution terms for each program are described in the
+12:23:59 (07/04) individual files in /usr/share/doc/*/copyright.
 
-12:14:08 (04/04) Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
-12:14:08 (04/04) permitted by applicable law.
-12:14:08 (04/04) stdin: is not a tty
-12:14:08 (04/04) /opt/i2dps/src
-12:14:08 (04/04) version:       1.0-8
-12:14:08 (04/04) build date:    2017-04-03 16:52
-12:14:08 (04/04) build_git_sha: 293fb84293ed9b40d8456f8014d1b87d8a6f666e
-12:14:08 (04/04) inicfg:        /opt/i2dps/etc/fnm2db.ini
-12:14:08 (04/04) This version only handles IPv4 by design
-12:14:09 (04/04) done
+12:23:59 (07/04) Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+12:23:59 (07/04) permitted by applicable law.
+12:23:59 (07/04) stdin: is not a tty
+12:23:59 (07/04) /opt/i2dps/src
+12:23:59 (07/04) version:       1.0-8
+12:23:59 (07/04) build date:    2017-04-03 16:52
+12:23:59 (07/04) build_git_sha: 293fb84293ed9b40d8456f8014d1b87d8a6f666e
+12:23:59 (07/04) inicfg:        /opt/i2dps/etc/fnm2db.ini
+12:23:59 (07/04) This version only handles IPv4 by design
+12:24:00 (07/04) done
