@@ -181,17 +181,19 @@ sub main(@) {
 		}
 	}
 
-	my $uuid	= $data{'globals'}{'uuid'};
-	my $server	= $data{'update'}{'server'};
-	my $user	= $data{'update'}{'user'};
-	my $pubkey	= $data{'update'}{'pubkey'};
-	my $privkey	= $data{'update'}{'privkey'};
-	my $passwd	= $data{'update'}{'passwd'};
+	my $uuid					= $data{'globals'}{'uuid'};
+	my $fastnetmoninstanceid	= $data{'globals'}{'fastnetmoninstanceid'};
+	my $administratorid			= $data{'globals'}{'administratorid'};
+	my $server					= $data{'update'}{'server'};
+	my $user					= $data{'update'}{'user'};
+	my $pubkey					= $data{'update'}{'pubkey'};
+	my $privkey					= $data{'update'}{'privkey'};
+	my $passwd					= $data{'update'}{'passwd'};
 	my $sftp_timeout = $data{'update'}{'sftp_timeout'};
 
-	my $mode	= $data{'globals'}{'mode'};
-	my $blocktime = $data{'globals'}{'blocktime'};
-	my $customernetworkid = $data{'globals'}{'customernetworkid'};
+	my $mode					= $data{'globals'}{'mode'};
+	my $blocktime				= $data{'globals'}{'blocktime'};
+	my $customerid				= $data{'globals'}{'customerid'};
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
 
 	close ($fh);
@@ -276,6 +278,7 @@ sub main(@) {
 			{
 				($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $frag, $str, $packets, $str, $length, $str, $str, $ttl, $str, $str, $ratio) =
 				split(' ', $_);
+
 			} elsif ($_ =~ /protocol:.*tcp/)
 			{
 				($date, $time, $src_sport, $andgt, $dst_dport, $str, $protocol, $str, $flags, $str, $frag, $str, $packets, $str, $length, $str, $str, $ttl, $str, $str, $ratio) = 
@@ -297,7 +300,7 @@ sub main(@) {
 			# type: fnm | ...
 			# version: 1
 			# attack_info: icmp_flood | syn_flood | udp_flood | unknown | ...
-			# Rules: networkid,uuid,blocktime,date,time,1,2,3,4,5,6,7,8,9,10,11,12
+			# Rules: networkid,uuid,administratorid,blocktime,date,time,1,2,3,4,5,6,7,8,9,10,11,12
 			# Type 1 - Destination Prefix
 			# Type 2 - Source Prefix
 			# Type 3 - IP Protocol
@@ -315,49 +318,65 @@ sub main(@) {
 			# silently drop lines which does not have all info
 			next if (!defined $src or !defined $sport or !defined $dst or !defined $dport or !defined $protocol or !defined $frag or !defined $packets or !defined $length or !defined $ttl or !defined $ratio or !defined $pps);
 
-			# not an address or portnumber
+			# skip if not an address or portnumber (icmp has port 0 in output)
 			($ver, $ip, $port) = parse_v4($src, $sport) or next;
 			($ver, $ip, $port) = parse_v4($dst, $dport) or next;
 
-			# not numbers
+			# skip if not numbers
 			($ttl	=~ /[0-9]*/) or next;
 			($ratio	=~ /[0-9]*/) or next;
 			($pps	=~ /[0-9]*/) or next;
 
-			# clean up and assign default values
-			$sport				= $sport		? $sport		: 0;
-			$dport				= $dport		? $dport		: 0;
-			$sport				= $sport		? $sport		: 0;
-			$icmp_type			= $icmp_type	? $icmp_type	: 0;
-			$icmp_code			= $icmp_code	? $icmp_code	: 0;
-			$flags				= $flags		? $flags		: 0;
-			#$length			= $length		? $length		: 0;
-			#$ttl				= $ttl			? $ttl			: 0;
-			$dscp				= $dscp			? $dscp			: 0;
-			$frag				= $frag			? $frag			: 0;
-			$attack_type		= $attack_type	? $attack_type	: 0;
+			# Clean up and assign default values
+			# https://www.grc.com/port_0.htm :
+			# "Port Zero" does not officially exist. It is defined as an invalid port
+			# number. But valid Internet packets can be formed and sent "over the wire" to
+			# and from "port 0" just as with any other ports. This will go into a database
+			# so use 'null' for non-set values
+
+			if ($sport			eq "")		{ $sport		= "null"; }
+			if ($dport			eq "")		{ $dport		= "null"; }
+			if ($icmp_type		eq "")		{ $icmp_type	= "null"; }
+			if ($icmp_code		eq "")		{ $icmp_code	= "null"; }
+			if ($flags			eq "")		{ $flags		= "null"; }
+			if ($length			eq "")		{ $length		= "null"; }
+			if ($ttl			eq "")		{ $ttl			= "null"; }
+			if ($dscp			eq "")		{ $dscp			= "null"; }
+			# https://www.wains.be/pub/networking/tcpdump_advanced_filters.txt
+			if ($frag			eq "" || $frag == 0)		{ $frag			= "null"; }
+			if ($attack_type	eq "")		{ $attack_type	= "null"; }
+
+			
+			# icmp has no ports so set it to null
+			if ($protocol		eq "icmp")
+			{
+				$sport = $dport = "null";
+			}
 
 #			print<<EOF;
 #
-# customernetworkid:  	$customernetworkid
-# uuid:  			$uuid
-# blocktime: 		$blocktime
-# dst: 			$dst
-# src:			$src
-# protocol:		$protocol
-# sport:			$sport
-# dport:			$dport
-# sport:			$sport
-# icmp_type:		$icmp_type
-# icmp_code:		$icmp_code
-# flags:			$flags
-# length:			$length
-# ttl:			$ttl
-# dscp:			$dscp
-# frag:			$frag
-# 
-# EOF
-			print $tmp_fh "$customernetworkid;$uuid;$blocktime;$dst;$src;$protocol;$sport;$dport;$sport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
+#customerid            $customerid
+#uuid:                 $uuid
+#fastnetmoninstanceid: $fastnetmoninstanceid
+#administratorid       $administratorid
+#blocktime:            $blocktime
+#dst:                  $dst
+#src:                  $src
+#protocol:             $protocol
+#sport:                $sport
+#dport:                $dport
+#port:                 $dport
+#icmp_type:            $icmp_type
+#icmp_code:            $icmp_code
+#flags:                $flags
+#length:               $length
+#ttl:                  $ttl
+#dscp:                 $dscp
+#frag:                 $frag
+#
+#EOF
+
+			print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
 		else
 		{

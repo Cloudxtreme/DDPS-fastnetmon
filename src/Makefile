@@ -50,8 +50,6 @@ sysinit		= /etc/init.d/fnm2db
 INSTALL		= $(PREFIX)/src/install-sh
 SRCTOMAN	= $(PREFIX)/src/srctoman
 
-#GID			= sysadm
-#UID			= sysadm
 GID			= root
 UID			= root
 
@@ -61,13 +59,8 @@ HFILES		= i2dps.h version.h license.h
 PRODINI		= fnm2db.ini
 TESTINI		= test.ini
 
-# apt-get -y install libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl
-# dpkg-query -L ... select ramdon file
-libnet-openssh-compat-perl	= /usr/share/perl5/Net/OpenSSH/Compat.pm
-libnet-openssh-compat-perl	= /usr/share/perl5/Net/OpenSSH/Compat/SSH2/Constants.pm
-libnet-ssh2-perl			= /usr/lib/x86_64-linux-gnu/perl5/5.20/Net/SSH2.pm
-
-debdepnd					= $(libnet-openssh-compat-perl) $(libnet-openssh-compat-perl) $(libnet-ssh2-perl)
+# required perl modules will be installed by default target (see install_perl_modules)
+pkgs		= libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl libnet-sftp-foreign-perl
 
 PUBKEY		= $(ETCDIR)/ssh/id_ed25519.pub
 PRIKEY		= $(ETCDIR)/ssh/id_ed25519
@@ -78,15 +71,14 @@ target		= $(BINDIR)/fnm2db
 initrc		= $(INITDIR)/$(RC)
 dbini		= $(ETCDIR)/$(PRODINI)
 
-# for comment in ssh keys only
+# for comment in ssh keys (see $(PUBKEY):)
 uuid := $(shell ifconfig |sed '/HWaddr/!d; s/.*HWaddr //; s/[[:blank:]]//g; q')
 fqdn := $(shell hostname -f )
 
 default:	$(prog) $(debdepnd)
-	./rollup.sh tcp
 
 # perl-version - mimic c version: add version information, set mode and print version. Do not install
-$(prog):	hostcheck fnm2db.pl version.pm
+$(prog):	hostcheck fnm2db.pl version.pm install_perl_modules
 			$(RM) $(prog)
 			@sed -e '/#INCLUDE_VERSION_PM/ {' -e 'r version.pm' -e 'd' -e'}'  fnm2db.pl > fnm2db
 			@chmod 555 fnm2db
@@ -138,20 +130,18 @@ $(target):	$(prog)
 $(dbini):	$(PRODINI)
 			$(INSTALL) -c -m 0755 -o $(UID) -g $(GID) $(PRODINI) $(ETCDIR)
 
-#
-# Dependencies
-#
-install-modules:
-	apt-get -y install libnet-openssh-compat-perl libnet-openssh-compat-perl libnet-ssh2-perl libnet-sftp-foreign-perl
-
-$(libnet-openssh-compat-perl-compat.pm):
-	apt-get -y install libnet-openssh-compat-perl
-
-$(libnet-openssh-compat-perl-compat.pm):
-	apt-get -y install libnet-openssh-compat-perl
-
-$(libnet-ssh2-perl-ssh2.pm):
-	apt-get -y install libnet-ssh2-perl
+# Install required perl modules from $(pkgs)
+install_perl_modules:
+	for P in $(pkgs);							\
+	do											\
+		dpkg -s "$$P" >/dev/null 2>&1;			\
+		case $$? in								\
+			0) : 								\
+			;;									\
+			1) sudo apt-get -y install $$P		\
+			;;									\
+		esac									\
+	done
 
 .SUFFIXES:
 

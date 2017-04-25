@@ -289,8 +289,11 @@ case $1 in
 		logit "exec 'make ${MAKE_ARGS} $2' on ${TARGETHOST} ... "
 		cat << EOF | ${SSH} ${SSH_ARGS} ${TARGETHOST} 2>&1 | logit
 cd ${UPLOADDIR}
-pwd
+echo "--------------------------------------------------------------------------------"
+echo "chdir ${UPLOADDIR}"
+echo "make ${MAKE_ARGS} $2"
 make ${MAKE_ARGS} $2
+echo "--------------------------------------------------------------------------------"
 EOF
 	;;
 	*)	usage
