@@ -5,7 +5,9 @@
 # This should have be written in some other language
 #
 
-MYDIR=`pwd`
+# determine the directory where $0 is located. Realpath is not part of OSX
+MYDIR=`dirname $0`
+MYDIR=`realpath ${MYDIR}`
 
 MYNAME=`basename $0`
 MY_LOGFILE=$MYDIR/${MYNAME}.log
@@ -128,7 +130,7 @@ else
 	git_sha=`git rev-parse HEAD`
 	build_date=`date +"%Y-%m-%d %H:%M"`
 
-	VERSION=`git tag 2>/dev/null | tail -1`
+	VERSION=`git tag 2>/dev/null | sort -n -t'-' -k2,2 | tail -1`
 	MAJOR="1"
 	MINOR="0"
 	PATCH="1"
@@ -289,11 +291,8 @@ case $1 in
 		logit "exec 'make ${MAKE_ARGS} $2' on ${TARGETHOST} ... "
 		cat << EOF | ${SSH} ${SSH_ARGS} ${TARGETHOST} 2>&1 | logit
 cd ${UPLOADDIR}
-echo "--------------------------------------------------------------------------------"
-echo "chdir ${UPLOADDIR}"
-echo "make ${MAKE_ARGS} $2"
+pwd
 make ${MAKE_ARGS} $2
-echo "--------------------------------------------------------------------------------"
 EOF
 	;;
 	*)	usage
