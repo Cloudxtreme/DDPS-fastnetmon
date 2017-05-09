@@ -128,7 +128,12 @@ sub main(@) {
 		print "This version only handles IPv4 by design\n";
 		exit 0;
 
+	} elsif($ARGV[0] eq "-v")
+	{
+			$verbose = 1;
+			shift @ARGV;
 	}
+
 	my $client_ip_as_string	=	$ARGV[0];	# ipv4 address
 	my $data_direction		=	$ARGV[1];	# 130.226.136.242 other 0 attack_details
 	my $pps					=	$ARGV[2];	# number
@@ -189,12 +194,14 @@ sub main(@) {
 	my $pubkey					= $data{'update'}{'pubkey'};
 	my $privkey					= $data{'update'}{'privkey'};
 	my $passwd					= $data{'update'}{'passwd'};
-	my $sftp_timeout = $data{'update'}{'sftp_timeout'};
+	my $sftp_timeout			= $data{'update'}{'sftp_timeout'};
 
 	my $mode					= $data{'globals'}{'mode'};
 	my $blocktime				= $data{'globals'}{'blocktime'};
 	my $customerid				= $data{'globals'}{'customerid'};
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
+
+	my $full_tcpdump_seen = 0;
 
 	close ($fh);
 
@@ -262,10 +269,17 @@ sub main(@) {
 		}
 
 		# tcpdump: I'm missing a lot of information here
-		next if (! />.*$client_ip_as_string/);
+
+		#FIXME
+		if ($_ !~ />.*$client_ip_as_string.*|.*$client_ip_as_string.*<.*bytes.*packets.*/ )
+		{
+			#logit("line skipped: $_");
+		}
 
 		if ($_ =~ /.*>.*$client_ip_as_string.*protocol:.*bytes.*ttl:.*/)
 		{
+			$full_tcpdump_seen = 1;
+
 			# example output
 			# 2016-06-08 16:18:53.299994 130.225.245.210:34859 > 130.226.136.242:5001 protocol: udp frag: 0  packets: 1 size: 1512 bytes ttl: 0 sample ratio: 1
 			# 2017-03-27 14:47:43.199756   21.30.184.209:14363 > 130.226.136.242:80   protocol: tcp flags: syn frag: 0  packets: 1 size: 60 bytes ttl: 63 sample ratio: 1
@@ -378,16 +392,45 @@ sub main(@) {
 
 			print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
+		elsif($_ =~ /.*$client_ip_as_string.*<.*bytes.*packets.*/)
+		{
+			if (($full_tcpdump_seen == 0) && ($attack_type !~ m/.*_flood/))		# reduced TCP dump prepends the full -- and they are different
+			{
+				# example output:
+				# 130.226.136.242:80 < 130.226.161.82:32768 74 bytes 1 packets
+				# 130.226.136.242:80 < 130.226.161.82:42622 355 bytes 4 packets
+				# So we only have $dst, $dport, $src and $sport (random) (size and packets are for the connection) and the $attack_protocol / $protocol
+
+				($dst_dport, $str, $src_sport, $str, $str, $str) =  split(' ', $_);
+
+				($src, $sport) = split(':', $src_sport);
+				($dst, $dport) = split(':', $dst_dport);
+
+				$icmp_type = $icmp_code = $flags = $length = $ttl = $dscp = $frag = "null";
+				$protocol = $attack_protocol;
+				print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
+			}
+			else
+			{
+				# logit("full_tcpdump_seen == $full_tcpdump_seen, unused input: $_");
+			}
+		}
 		else
 		{
 			# non-tcpdump line ignored
-			#: print "hmm :=-> $_\n";
 			#logit("unused input: $_");
 		}
 	}
 	print $tmp_fh "last-line\n";
 	close($tmp_fh)||mydie "close $tmp_fh failed: $!";
-	logit("printed new rules to $tmp_fh ... ");
+	if ($full_tcpdump_seen == 1)
+	{
+		logit("using full TCP dump: printed new rules to $tmp_fh ... ");
+	}
+	else
+	{
+		logit("using no TCP dump: printed new rules to $tmp_fh ... ");
+	}
 
 	my $sftp=Net::SFTP::Foreign->new(
 		host => $server,

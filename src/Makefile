@@ -45,7 +45,7 @@ SRCDIR		= $(PREFIX)/src
 iniparser 	= iniparser
 libini		= $(iniparser)/src
 
-sysinit		= /etc/init.d/fnm2db
+#sysinit		= /etc/init.d/fnm2db
 
 INSTALL		= $(PREFIX)/src/install-sh
 SRCTOMAN	= $(PREFIX)/src/srctoman
@@ -84,7 +84,7 @@ $(prog):	hostcheck fnm2db.pl version.pm install_perl_modules
 			@chmod 555 fnm2db
 			./$(prog) -V
 
-install:	hostcheck $(target) $(initrc) $(dbini) $(sysinit) $(PUBKEY)
+install:	hostcheck $(target) $(initrc) $(dbini) $(PUBKEY)   #$(sysinit) 
 			$(MAKE) dirs
 
 run:		$(target) $(initrc) $(dbini)
@@ -109,26 +109,44 @@ hostcheck:
 
 # Unused article on how to Write Linux Init Scripts Based on LSB Init Standard:
 # http://www.thegeekstuff.com/2012/03/lsbinit-script/
-$(sysinit): $(RC)
-			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) /etc/init.d
-			update-rc.d fnm2dbrc defaults
-			systemctl enable fnm2dbrc
-			systemctl start fnm2dbrc
-			systemctl status fnm2dbrc
+#$(sysinit): $(RC)
+#			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) /etc/init.d
+#			update-rc.d fnm2dbrc defaults
+#			systemctl enable fnm2dbrc
+#			systemctl start fnm2dbrc
+#			systemctl status fnm2dbrc
+
+#			update-rc.d fnm2dbrc remove
+#			systemctl disable fnm2dbrc
+#			/bin/rm -f /etc/init.d/fnm2dbrc
+#			systemctl daemon-reload
+#			systemctl reset-failed
 
 dirs:
 			mkdir -p $(PREFIX)/bin $(PREFIX)/tmp $(PREFIX)/log $(PREFIX)/src $(PREFIX)/etc/init.d $(PREFIX)/etc/ssh/
 			chown -R $(UID):$(GID) $(PREFIX)
 			chmod 700 $(PREFIX)/etc/ssh/
 
-$(initrc):	$(RC)
-			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
+#$(initrc):	$(RC)
+#			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
 
 $(target):	$(prog)
 			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(prog) $(BINDIR)
 
 $(dbini):	$(PRODINI)
 			$(INSTALL) -c -m 0755 -o $(UID) -g $(GID) $(PRODINI) $(ETCDIR)
+
+
+print:
+	for FILE in fnm2db.pl; do								\
+			BFILE=`basename $$FILE` ;						\
+			echo $$BFILE ;									\
+			sed '/#++/,/^#--/d' < $$BFILE |					\
+				a2ps -1 --border=no --font-size 5 --stdin="$$BFILE"						\
+					--right-footer="" --left-footer="" --footer="" --no-header --line-numbers=5 -o  - |	\
+				pstopdf -i -o /tmp/$$BFILE.lst.pdf;			\
+				file /tmp/$$BFILE.lst.pdf;					\
+		done
 
 # Install required perl modules from $(pkgs)
 install_perl_modules:
