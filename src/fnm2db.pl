@@ -264,7 +264,7 @@ sub main(@) {
 
 		if (($header_printed == 0) && ($attack_type ne ''))
 		{
-			print $tmp_fh "head;fnm;1;$attack_type\n";
+			print $tmp_fh "head;fnm;doop;1;$attack_type\n";
 			$header_printed = 1;
 		}
 
