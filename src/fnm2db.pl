@@ -201,6 +201,8 @@ sub main(@) {
 	my $customerid				= $data{'globals'}{'customerid'};
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
 
+	my $lines = 0;
+
 	my $full_tcpdump_seen = 0;
 
 	close ($fh);
@@ -390,6 +392,7 @@ sub main(@) {
 #
 #EOF
 
+			$lines ++;
 			print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
 		elsif($_ =~ /.*$client_ip_as_string.*<.*bytes.*packets.*/)
@@ -408,6 +411,7 @@ sub main(@) {
 
 				$icmp_type = $icmp_code = $flags = $length = $ttl = $dscp = $frag = "null";
 				$protocol = $attack_protocol;
+				$lines ++;
 				print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 			}
 			else
@@ -425,48 +429,56 @@ sub main(@) {
 	close($tmp_fh)||mydie "close $tmp_fh failed: $!";
 	if ($full_tcpdump_seen == 1)
 	{
-		logit("using full TCP dump: printed new rules to $tmp_fh ... ");
+		logit("using full TCP dump: printed new rules with $lines lines to $tmp_fh ... ");
 	}
 	else
 	{
-		logit("using no TCP dump: printed new rules to $tmp_fh ... ");
+		logit("using no TCP dump: printed new rules with $lines lines to $tmp_fh ... ");
 	}
 
-	my $sftp=Net::SFTP::Foreign->new(
-		host => $server,
-		user => $user,
-		timeout => $sftp_timeout,
-		autodie => 0,
-		more => [
-			"-oIdentityFile=$privkey",
-			'-oPreferredAuthentications=publickey',
-			], );
+	if ($lines != 0)
+	{
+		my $sftp=Net::SFTP::Foreign->new(
+			host => $server,
+			user => $user,
+			timeout => $sftp_timeout,
+			autodie => 0,
+			more => [
+				"-oIdentityFile=$privkey",
+				'-oPreferredAuthentications=publickey',
+				], );
 
-	if ($sftp->error ne 0)
-	{
-		logit("Unable to establish SFTP connection: $sftp->status");
-		$sftp->disconnect;
-	}
-	else
-	{
-		my $now = time();
-		my $remote_file = "/upload/newrules-${uuid}-${now}-" . randstr(8, 'a'..'z', 0..9) . ".dat";
-		logit("uploading $tmp_fh as $remote_file");
-		$sftp->put("$tmp_fh", "$remote_file");
 		if ($sftp->error ne 0)
 		{
-			$error_string = $sftp->error;
-			logit("error:  put $user\@$server:'$remote_file' failed: $error_string");
-			$error_string = $sftp->status;
-			logit("status: put $user\@$server:'$remote_file' failed: $error_string");
-			logit("leaving local file '$tmp_fh'");
+			logit("Unable to establish SFTP connection: $sftp->status");
+			$sftp->disconnect;
 		}
 		else
 		{
-			logit("upload ok removing local file '$tmp_fh'");
-			unlink($tmp_fh);
+			my $now = time();
+			my $remote_file = "/upload/newrules-${uuid}-${now}-" . randstr(8, 'a'..'z', 0..9) . ".dat";
+			logit("uploading $tmp_fh as $remote_file");
+			$sftp->put("$tmp_fh", "$remote_file");
+			if ($sftp->error ne 0)
+			{
+				$error_string = $sftp->error;
+				logit("error:  put $user\@$server:'$remote_file' failed: $error_string");
+				$error_string = $sftp->status;
+				logit("status: put $user\@$server:'$remote_file' failed: $error_string");
+				logit("leaving local file '$tmp_fh'");
+			}
+			else
+			{
+				logit("upload ok removing local file '$tmp_fh'");
+				unlink($tmp_fh);
+			}
+			$sftp->disconnect;
 		}
-		$sftp->disconnect;
+	}
+	else
+	{
+		logit("only $lines of rules, not sending rules");
+		unlink($tmp_fh);
 	}
 	exit(0);
 }

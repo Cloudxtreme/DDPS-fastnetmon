@@ -1,4 +1,4 @@
-14:41:52 (10/05) Begin
-14:41:52 (10/05) called as: ./remote.sh -d -g -v make
-14:41:52 (10/05) making developer version files ... 
-14:41:52 (10/05) exec git commands in /Users/uninth/ownsky/src/github/DDPS-fastetmon:
+10:32:42 (19/05) Begin
+10:32:42 (19/05) called as: ./remote.sh -d -g -v make
+10:32:42 (19/05) making developer version files ... 
+10:32:42 (19/05) exec git commands in /Users/uninth/ownsky/src/github/DDPS-fastetmon:
