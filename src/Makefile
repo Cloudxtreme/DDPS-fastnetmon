@@ -130,6 +130,12 @@ dirs:
 #$(initrc):	$(RC)
 #			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
 
+cron:
+			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) watchdog.sh $(BINDIR)
+			echo '*/5 * * * * root [ -x /opt/i2dps/bin/watchdog.sh ] && /opt/i2dps/bin/watchdog.sh' > /etc/cron.d/watchdog
+			chmod 0640 /etc/cron.d/watchdog
+			service cron restart
+
 $(target):	$(prog)
 			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(prog) $(BINDIR)
 
