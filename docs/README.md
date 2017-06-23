@@ -24,14 +24,14 @@ Then edit the configuration file for `fnm2db`:
 
 Change the following options - they must match the customer / database entries:
 
-	customerid				= 1
-	fastnetmoninstanceid	= 1
-	uuid					= 00:25:90:47:2b:48
-	administratorid			= 42
+	customerid           = 1
+	fastnetmoninstanceid = 1
+	uuid                 = 00:25:90:47:2b:48
+	administratorid      = 42
     ... 
-	server					= 172.22.89.4
-	pubkey					= /opt/i2dps/etc/ssh/id_ed25519.pub
-	privkey					= /opt/i2dps/etc/ssh/id_ed25519
+	server               = 172.22.89.4
+	pubkey               = /opt/i2dps/etc/ssh/id_ed25519.pub
+	privkey              = /opt/i2dps/etc/ssh/id_ed25519
 
 `customerid` matches _netdrift_ and all our networks while `fastnetmoninstanceid` should be added to the database.
 The `uuid` is actually the Mac address of the 10Gb netcard (or similar - I see that it doesn't match on the first
