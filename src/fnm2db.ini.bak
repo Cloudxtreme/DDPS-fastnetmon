@@ -11,8 +11,8 @@ administratorid			= 42
 # Enable/Disable DDoS on/off
 mitigation				= on
 
-# discard | rate-limit 9600
-mode					= discard
+# notify | block | ratelimit
+mode					= block
 # minutes to block/ratelimit/... in minutes (approximately)
 blocktime				= 10
 

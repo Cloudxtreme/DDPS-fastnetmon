@@ -11,23 +11,6 @@ use FileHandle;
 use Getopt::Long;
 use Digest::MD5;
 use sigtrap qw(die normal-signals);
-use strict;
-use warnings;
-use 5.14.0;             # say, switch etc.
-use sigtrap qw(die normal-signals);
-use DBI;                # database
-
-use Sys::Syslog;        # only needed for logit
-use POSIX;              # only needed for logit
-use Getopt::Long qw(:config no_ignore_case);
-use Net::SSH2;          # ssh v2 access to postgres db
-use List::MoreUtils qw(uniq);
-use Proc::Daemon;
-use Socket qw( inet_aton );
-use NetAddr::IP;
-use Path::Tiny;
-use File::stat;
-use File::Temp qw(tempfile);
 
 my ($action,$customerid,$uuid,$fastnetmoninstanceid,$administratorid,$blocktime,$dst,$src,$protocol,$sport,$dport,$icmp_type,$icmp_code,$flags,$length,$ttl,$dscp,$frag   );
 

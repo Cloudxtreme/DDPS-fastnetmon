@@ -16,13 +16,12 @@ do
 		*)	$logger -p daemon.warn "${D} not running, restarting"
 			START=`/bin/date +%s`
 			$systemctl status ${FNM} | $logger -p daemon.warn
-
 			$systemctl stop		${FNM}
 			$systemctl stop		${IDB}
 			$systemctl start	${IDB}
 			$systemctl start	${FNM}
-
 			END=`/bin/date +%s`
+
 			DOWNTIME=`echo "$END - $START"|bc`
 			$logger -p daemon.warn "restarted fastnetmon and influxdb: downtime $DOWNTIME"
 		;;

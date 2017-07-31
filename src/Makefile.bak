@@ -2,7 +2,8 @@
 #:REMOTE-INFO-BEGIN
 # TARGETHOST   deployment/test host or IP address, e.g. user@1.2.3.4
 #TARGETHOST      = root@172.22.89.2
-TARGETHOST      = root@fastnetmon1.deic.dk
+TARGETHOST      = root@fastnetmon2.deic.dk
+# fastnetmon1
 # TARGETHOST      = uninth@192.168.99.100
 #TARGETHOST      = sysadm@ddps.ssi.i2.dk
 #->TARGETHOST      = sysadm@172.16.201.113

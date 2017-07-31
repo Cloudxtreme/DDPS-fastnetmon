@@ -201,8 +201,6 @@ sub main(@) {
 	my $customerid				= $data{'globals'}{'customerid'};
 	my $tmp_fh = new File::Temp( UNLINK => 0, TEMPLATE => 'newrules_XXXXXXXX', DIR => '/tmp', SUFFIX => '.dat');
 
-	my $description				= "automatic detected";
-
 	my $lines = 0;
 
 	my $full_tcpdump_seen = 0;
@@ -394,7 +392,7 @@ sub main(@) {
 #EOF
 
 			$lines ++;
-			print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag;$mode;$description\n";
+			print $tmp_fh "$customerid;$uuid;$fastnetmoninstanceid;$administratorid;$blocktime;$dst;$src;$protocol;$sport;$dport;$dport;$icmp_type;$icmp_code;$flags;$length;$ttl;$dscp;$frag\n";
 		}
 		elsif($_ =~ /.*$client_ip_as_string.*<.*bytes.*packets.*/)
 		{
