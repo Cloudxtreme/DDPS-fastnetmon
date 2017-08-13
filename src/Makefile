@@ -2,13 +2,12 @@
 #:REMOTE-INFO-BEGIN
 # TARGETHOST   deployment/test host or IP address, e.g. user@1.2.3.4
 #TARGETHOST      = root@172.22.89.2
-TARGETHOST      = root@fastnetmon1.deic.dk
-# TARGETHOST      = uninth@192.168.99.100
+TARGETHOST      = root@fnm-dev.deic.dk
 #TARGETHOST      = sysadm@ddps.ssi.i2.dk
-#->TARGETHOST      = sysadm@172.16.201.113
 # UPLOADDIR    top directory for the source; everything from '.' will be synced
 #              with rsync to there! The directory must exist
 UPLOADDIR       = /opt/i2dps/src/
+UPLOADDIR       = src-i2dps
 
 # Path to local and remote rsync
 RRSYNC          = /usr/bin/rsync
@@ -48,8 +47,8 @@ libini		= $(iniparser)/src
 
 #sysinit		= /etc/init.d/fnm2db
 
-INSTALL		= $(PREFIX)/src/install-sh
-SRCTOMAN	= $(PREFIX)/src/srctoman
+INSTALL		= ./install-sh
+SRCTOMAN	= ./srctoman
 
 GID			= root
 UID			= root
@@ -78,15 +77,13 @@ fqdn := $(shell hostname -f )
 
 default:	$(prog) $(debdepnd)
 
-# perl-version - mimic c version: add version information, set mode and print version. Do not install
 $(prog):	hostcheck fnm2db.pl version.pm install_perl_modules
 			$(RM) $(prog)
 			@sed -e '/#INCLUDE_VERSION_PM/ {' -e 'r version.pm' -e 'd' -e'}'  fnm2db.pl > fnm2db
 			@chmod 555 fnm2db
 			./$(prog) -V
 
-install:	hostcheck $(target) $(initrc) $(dbini) $(PUBKEY)   #$(sysinit) 
-			$(MAKE) dirs
+install:	hostcheck $(dirs) $(target) $(initrc) $(dbini) $(PUBKEY)   #$(sysinit) 
 
 run:		$(target) $(initrc) $(dbini)
 			$(target) -v -s 2
@@ -108,28 +105,13 @@ hostcheck:
 			fi
 			chmod 555 $(INSTALL) $(SRCTOMAN)
 
-# Unused article on how to Write Linux Init Scripts Based on LSB Init Standard:
-# http://www.thegeekstuff.com/2012/03/lsbinit-script/
-#$(sysinit): $(RC)
-#			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) /etc/init.d
-#			update-rc.d fnm2dbrc defaults
-#			systemctl enable fnm2dbrc
-#			systemctl start fnm2dbrc
-#			systemctl status fnm2dbrc
-
-#			update-rc.d fnm2dbrc remove
-#			systemctl disable fnm2dbrc
-#			/bin/rm -f /etc/init.d/fnm2dbrc
-#			systemctl daemon-reload
-#			systemctl reset-failed
-
 dirs:
 			mkdir -p $(PREFIX)/bin $(PREFIX)/tmp $(PREFIX)/log $(PREFIX)/src $(PREFIX)/etc/init.d $(PREFIX)/etc/ssh/
 			chown -R $(UID):$(GID) $(PREFIX)
 			chmod 700 $(PREFIX)/etc/ssh/
 
-#$(initrc):	$(RC)
-#			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
+$(initrc):	$(RC)
+			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(RC) $(INITDIR)
 
 cron:
 			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) watchdog.sh $(BINDIR)
@@ -138,11 +120,17 @@ cron:
 			service cron restart
 
 $(target):	$(prog)
-			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(prog) $(BINDIR)
+			$(INSTALL) -c -m 0555 -o $(UID) -g $(GID) $(prog) $(BINDIR)/
 
 $(dbini):	$(PRODINI)
-			$(INSTALL) -c -m 0755 -o $(UID) -g $(GID) $(PRODINI) $(ETCDIR)
-
+			if [ -e ${dbini} ]; then													\
+				echo "existing ${dbini} preserved";										\
+				echo "not removing existing ${dbini}";									\
+				echo "new db.ini installed as ${dbini}.new";							\
+				sudo /bin/cp ${PRODINI} ${dbini}.new;									\
+			else																		\
+				sudo $(INSTALL) -c -m 0755 -o $(UID) -g $(GID) $(PRODINI) $(ETCDIR)/;	\
+			fi
 
 print:
 	for FILE in fnm2db.pl; do								\

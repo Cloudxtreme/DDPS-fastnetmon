@@ -1,4 +1,51 @@
-15:18:46 (31/07) Begin
-15:18:46 (31/07) called as: ./remote.sh -d -g -v make
-15:18:46 (31/07) making developer version files ... 
-15:18:46 (31/07) exec git commands in /Users/uninth/ownsky/src/github/DDPS-fastetmon:
+17:08:15 (11/08) Begin
+17:08:15 (11/08) called as: ./remote.sh -v make install
+17:08:15 (11/08) Environment:
+17:08:15 (11/08) git_sha:        '84e8f056a9d9f6b6747eafc3ef0e4076bb4898b7'
+17:08:15 (11/08) build_date:     '2017-08-11 17:08'
+17:08:15 (11/08) TARGETHOST:     'root@fnm-dev.deic.dk'
+17:08:15 (11/08) UPLOADDIR:      'src-i2dps'
+17:08:15 (11/08) EXCLUDE_FILE:   'rsync_exclude.txt'
+17:08:15 (11/08) TMPDIR:         '/var/folders/2d/n362xj9148lg_rrsgy61wsjr0008qx/T/'
+17:08:15 (11/08) RRSYNC:         '/usr/bin/rsync'
+17:08:15 (11/08) LRSYNC:         '/usr/bin/rsync'
+17:08:15 (11/08) RSYNC_ARGS:     '-avzH --exclude-from=rsync_exclude.txt'
+17:08:15 (11/08) SSH_ARGS:       '-Tq -o LogLevel=error'
+17:08:15 (11/08) SSH:            '/usr/bin/ssh'
+17:08:15 (11/08) SRCDIR:         '.'
+17:08:15 (11/08) PROJDIR:        '../../DDPS-fastetmon'
+17:08:15 (11/08) MYDIR:          '/Users/uninth/ownsky/src/github/DDPS-fastetmon/src'
+17:08:15 (11/08) rsync files to root@fnm-dev.deic.dk ... 
+17:08:15 (11/08) command: /usr/bin/rsync -avzH --exclude-from=rsync_exclude.txt --rsync-path /usr/bin/rsync /Users/uninth/ownsky/src/github/DDPS-fastetmon/src/ root@fnm-dev.deic.dk:src-i2dps/
+17:08:15 (11/08) building file list ... done
+17:08:15 (11/08) ./
+17:08:15 (11/08) .source_info
+
+17:08:15 (11/08) sent 658 bytes  received 66 bytes  482.67 bytes/sec
+17:08:15 (11/08) total size is 63754  speedup is 88.06
+17:08:16 (11/08) exec 'make  install' on root@fnm-dev.deic.dk ... 
+17:08:16 (11/08) mesg: ttyname failed: Inappropriate ioctl for device
+17:08:16 (11/08) /root/src-i2dps
+17:08:16 (11/08) version:       1.0-17
+17:08:16 (11/08) build date:    2017-07-31 15:18
+17:08:16 (11/08) build_git_sha: c89565231f1afa70dce04a206e965868a1614e63
+17:08:16 (11/08) inicfg:        /opt/i2dps/etc/fnm2db.ini
+17:08:16 (11/08) This version only handles IPv4 by design
+17:08:16 (11/08) Generating public/private ED25519 key pair.
+17:08:16 (11/08) Your identification has been saved in /opt/i2dps/etc/ssh/id_ed25519.
+17:08:16 (11/08) Your public key has been saved in /opt/i2dps/etc/ssh/id_ed25519.pub.
+17:08:16 (11/08) The key fingerprint is:
+17:08:16 (11/08) SHA256:3IiF19DJz6D32OBnEWJVvYe1greE8ia4tUGccCahb4w root@08:00:27:63:98:d2-fnm-dev.deic.dk
+17:08:16 (11/08) The key's randomart image is:
+17:08:16 (11/08) +--[ED25519 256]--+
+17:08:16 (11/08) |       .oo o.... |
+17:08:16 (11/08) |      .+ =B .   o|
+17:08:16 (11/08) |     .. Ooo=o. oo|
+17:08:16 (11/08) |      +=.Boo++.o.|
+17:08:16 (11/08) |     E.+So+=o.o .|
+17:08:16 (11/08) |      .. +oo=.   |
+17:08:16 (11/08) |        o =o     |
+17:08:16 (11/08) |       . .       |
+17:08:16 (11/08) |                 |
+17:08:16 (11/08) +----[SHA256]-----+
+17:08:16 (11/08) done
