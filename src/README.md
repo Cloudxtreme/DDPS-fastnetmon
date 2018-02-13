@@ -4,6 +4,9 @@
 The _fastnetmon notification script_ is written in Perl and requires some Perl modules which
 may be installed as Debian packages.
 
+Either just deploy with `dpkg -i i2dps_1.0-18.deb; apt-get -y -f install`.
+Create the debian package on Ubuntu/Debian/OSX with mk-deb
+
 Development is done some where else than on the target host. So
   - Either copy everything to the target host, or
   - edit ``Makefile`` accordingly:

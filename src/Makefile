@@ -27,12 +27,13 @@ PROJDIR         = ../../DDPS-fastetmon
 
 #:REMOTE-INFO-END
 #
-# Makefile for /opt/i2dps/src
+# Makefile for i2dps
 #
 # NTHA 2016
 #
 # vim: set nonu ts=4 sw=4 tw=0:
 #
+
 PREFIX		= /opt/i2dps
 BINDIR		= $(PREFIX)/bin
 TMPDIR		= $(PREFIX)/tmp
@@ -84,6 +85,9 @@ $(prog):	hostcheck fnm2db.pl version.pm install_perl_modules
 			./$(prog) -V
 
 install:	hostcheck $(dirs) $(target) $(initrc) $(dbini) $(PUBKEY)   #$(sysinit) 
+
+runinstall: hostcheck
+			bash ./setup.sh
 
 run:		$(target) $(initrc) $(dbini)
 			$(target) -v -s 2
@@ -155,6 +159,13 @@ install_perl_modules:
 			;;									\
 		esac									\
 	done
+
+# debian project
+
+dpkg:
+	echo "building project for ${package} (sudo required at least on my mac ....) "
+	sudo sh mk-deb.sh
+
 
 .SUFFIXES:
 

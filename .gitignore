@@ -43,3 +43,4 @@ x.pl
 **/compile_stock_driver/
 **/compile_stock_driver/ixgbe*
 **/compile_stock_driver/i40e*
+**/i2dps_*/
