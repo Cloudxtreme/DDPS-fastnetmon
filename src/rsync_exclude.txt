@@ -1,0 +1,15 @@
+test/
+data/
+*.BAK
+*.bak
+*.md
+*.swp
+.DS_Store
+._*
+.vscode/
+Makefile.*
+download-*
+obsolite
+remote.sh
+remote.sh.log
+rsync_exclude.txt

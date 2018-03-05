@@ -1,0 +1,32 @@
+name: i2dps_1.0-19
+version: 1.0-19
+origin: local/i2dps_1.0-19
+comment: DDPS Notification script for FastNetMon
+arch: FreeBSD:11:amd64
+www: https://www.deic.dk
+maintainer: Niels Thomas Haugård
+prefix: /
+desc: Perl version of DDPS notification script used by FastNetMon
+Categories: local
+deps: {
+  perl5: { version: "5.24.3", origin: lang/perl5.24 }
+  p5-Net-SFTP-Foreign: { version: "1.73_1", origin: net/p5-Net-SFTP-Foreign }
+  p5-Net-OpenSSH: { version: "0.73", origin: net/p5-Net-OpenSSH }
+  p5-Net-SSH2: { version: "0.58", origin: net/p5-Net-SSH2 }
+}
+files: {
+  /opt/i2dps/etc/fnm2db.ini: { sum: 01649b32bad0e2b522060e7a4e0b31b13f7b7b983f6a0eb24a3a57bf3ddc7735, uname: root, gname: wheel, perm: 0744 }
+  /opt/i2dps/bin/fnm2db: { sum: 40782b966a28f0d8190b9dee28dcb15b45b954a3c4ddacf37e0eb9e2610a6f80, uname: root, gname: wheel, perm: 0555 }
+  /opt/i2dps/bin/watchdog.sh: { sum: 03ec378d53ac6c5ee0fdedf9032bbe078f86f3f2528c08c66105039bcdc76603, uname: root, gname: wheel, perm: 0555 }
+  /etc/cron.d/watchdog: { sum: 756565fa6bc24c2d3d74cc4a8032cbe67b0d38be21045585fcefbc7b20c555b0, uname: root, gname: wheel, perm: 0640 }
+}
+directories: {
+  /opt: 'y';
+  /opt/i2dps: 'y';
+  /opt/i2dps/tmp: 'y';
+  /opt/i2dps/log: 'y';
+  /opt/i2dps/etc: 'y';
+  /opt/i2dps/etc/ssh: 'y';
+  /opt/i2dps/etc/init.d: 'y';
+  /opt/i2dps/bin: 'y';
+}

@@ -1,0 +1,1236 @@
+# This file is used with bsdinstall(8) and  loaded into a FreeBSD .iso in /etc.
+# We then create  a custom FreeBSD ISO, with the  following specifications. All
+# automated and without user intervention.
+#
+# Result:  tighten sshd  config, OpenVPN  with initial  configuration, software
+# installed without configuration files, template files for fastnetmon, influxd
+# and rc.conf
+#
+# TODO: assign production  OpenVPN and SSH keys from DDPS,  correct rc.conf and
+# start services. see gitlab.ddps.deic.dk
+
+# 1. PREAMBLE. First define variables bsdinstall(8) needs
+
+## Distribution files to install
+DISTRIBUTIONS="kernel.txz base.txz"
+
+## Variations in root disk device
+if [ -e /dev/ada0 ]; then
+  DISKSLICE=ada0
+elif [ -e /dev/da0 ]; then
+  DISKSLICE=da0
+elif [ -e /dev/vtbd0 ]; then
+  DISKSLICE=vtbd0
+else
+  echo "Unknown disk device"
+  exit -1
+fi
+
+export ZFSBOOT_DISKS="$DISKSLICE"
+export ZFSBOOT_CONFIRM_LAYOUT=0
+
+## Dont run interactive for ZFS setup
+export nonInteractive="YES"
+
+
+# 2. SETUP SCRIPT. After variables are defined - scripting begins
+#!/bin/sh
+
+## /boot/loader.conf - configurations
+cat <<EOF >> /boot/loader.conf
+autoboot_delay=3
+verbose_loading="YES"
+hw.usb.disable_enumeration=1
+hw.usb.no_boot_wait=1
+hw.usb.no_shutdown_wait=1
+EOF
+
+
+## /etc/rc.conf - configurations
+cat <<EOF >> /etc/rc.conf
+hostname="bootstrapped"
+keymap="dk"
+ifconfig_DEFAULT="SYNCDHCP"
+openvpn_enable="YES"
+openvpn_configfile="/usr/local/etc/openvpn/openvpn.conf"
+sshd_enable="YES"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+sendmail_enable="NONE"
+dumpdev="NO"
+EOF
+
+## Set Time Zone to CET (CPH)
+/usr/sbin/tzsetup Europe/Copenhagen
+
+## Create the folder /usr/local/etc/rc.d
+mkdir -p /usr/local/etc/rc.d
+chmod 755 /usr/local/etc/rc.d
+
+
+## Create a first time boot setup script that runs only once,
+## after a successful installation with the custom ISO.
+cat <<EOF > /usr/local/etc/rc.d/rc.firsttime.sh
+# REQUIRE: NETWORKING
+# BEFORE: LOGIN
+
+# FreeBSD RELEASE updates
+env PAGER=cat freebsd-update fetch
+env PAGER=cat freebsd-update install
+
+# Update packages
+env ASSUME_ALWAYS_YES=YES pkg update -f
+env ASSUME_ALWAYS_YES=YES pkg upgrade -q -y
+
+# Install packages
+env ASSUME_ALWAYS_YES=YES pkg install -q -y openvpn fastnetmon influxdb openvpn tmux bash vim-lite zsh pkt-gen mtr-nox11
+
+# Clean packages
+env ASSUME_ALWAYS_YES=YES pkg autoremove
+env ASSUME_ALWAYS_YES=YES pkg clean -a
+
+# Remove the script after first run
+/bin/rm -rf /usr/local/etc/rc.d/rc.firsttime.sh
+reboot
+
+exit 0
+EOF
+
+
+## Setup OpenVPN client configuration
+mkdir -p /usr/local/etc/openvpn/
+cat <<'EOF' > /usr/local/etc/openvpn/openvpn.conf
+##############################################
+# This configuration can be used by multiple #
+# clients, however each client should have   #
+# its own cert and key files.                #
+##############################################
+
+# Specify that we are a client and that we
+# will be pulling certain config file directives
+# from the server.
+client
+
+# Use the same setting as you are using on
+# the server.
+# On most systems, the VPN will not function
+# unless you partially or fully disable
+# the firewall for the TUN/TAP interface.
+dev tun
+
+# Are we connecting to a TCP or
+# UDP server?  Use the same setting as
+# on the server.
+proto udp
+
+# The hostname/IP and port of the server.
+# You can have multiple remote entries
+# to load balance between the servers.
+remote 130.225.242.202 1194
+
+# Route all traffic through the VPN.
+redirect-gateway
+
+# Select a cryptographic cipher.
+# This config item must be copied to
+# the client config file as well.
+# Note that 2.4 client/server will automatically
+# negotiate AES-256-GCM in TLS mode.
+# See also the ncp-cipher option in the manpage
+cipher AES-128-CBC
+auth SHA1
+
+# Keep trying indefinitely to resolve the
+# host name of the OpenVPN server.  Very useful
+# on machines which are not permanently connected
+# to the internet such as laptops.
+resolv-retry infinite
+
+# Most clients don't need to bind to
+# a specific local port number.
+nobind
+
+# Try to preserve some state across restarts.
+persist-key
+persist-tun
+
+# If you are connecting through an
+# HTTP proxy to reach the actual OpenVPN
+# server, put the proxy server/IP and
+# port number here.  See the man page
+# if your proxy server requires
+# authentication.
+;http-proxy-retry # retry on connection failures
+;http-proxy [proxy server] [proxy port #]
+
+# Wireless networks often produce a lot
+# of duplicate packets.  Set this flag
+# to silence duplicate packet warnings.
+mute-replay-warnings
+
+# Verify server certificate by checking that the
+# certicate has the correct key usage set.
+# This is an important precaution to protect against
+# a potential attack discussed here:
+#  http://openvpn.net/howto.html#mitm
+remote-cert-tls server
+
+# Compression.
+;comp-lzo
+
+# Set log file verbosity.
+verb 3
+
+# Silence repeating messages.
+mute 20
+
+# Keydirection for embedded keys.
+key-direction 1
+
+# Inline certificates and keys below.
+
+<tls-auth>
+#
+# 2048 bit OpenVPN static key
+#
+-----BEGIN OpenVPN Static key V1-----
+e744912e9c1799ccd059590729167788
+363718f494ae4ff35fdb52e6dd2f2baf
+23ff3d3332a1e0740e948e97fcd1b67b
+32f21968cac8398ce400c4285392dbf3
+4dd5cf75b754021b8a18642af682cb24
+72679da78fe800e003d41d40a92268d2
+3ede885c252b6f723d3b4616ba8b7f17
+0a511def09ea318340d07f6f2599bc7f
+2ad37d737d0da74e4774e7427b80e80e
+0c638dbeb515ba2749dcc93ea386f0e5
+f852ad7ecfc0b4e16b0eeb89b4288071
+bfaf2778f0e0b20f78a4b8f36b068249
+528411fe09d33874d1486b54f496de57
+c9db99d56ffe72dc02517f5174d3ce31
+7d5d8c58f14b80d109e394b9518c6653
+9cbb71d9d2e39809f2308ac3186b73a3
+-----END OpenVPN Static key V1-----
+</tls-auth>
+<ca>
+-----BEGIN CERTIFICATE-----
+MIIDQTCCAimgAwIBAgIJAJ1klYLNOdCvMA0GCSqGSIb3DQEBCwUAMBoxGDAWBgNV
+BAMMD0REUFMuREVJQy5ESyBDQTAeFw0xNzA5MDgxMTE1NDFaFw0yNzA5MDYxMTE1
+NDFaMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQTCCASIwDQYJKoZIhvcNAQEB
+BQADggEPADCCAQoCggEBAMoC6IipqHwe0Cc2BFJ5JIG6y3wosn1HfQ9HLC821XPh
+xhR7sJwXxDAPbTYRkCciFexZhaxKsx9bXjwlYK2X6kh1HWosrBNVXrclUzbL4l4+
+rrdWRJTHZDfX0iJIAbB8J/bpdpS7uxxTevg8yrHPLn8DVR5pQUB23XlpWbPs08Bu
+oxo/M52gfVG4P2X57U1dSxefBX6zl7yv6+sqabPRstzoxeYoksqQl5l0pWdhTKOU
+0byI1gQHLezrCKePatGglBTF610lFcsH8PHfzgp3JLAdiwVixqParwgd8OwwXgY3
+FcyRsOCm6w+xkjMPPzwnyUxDpJ+gyf0OcNePoti5U20CAwEAAaOBiTCBhjAdBgNV
+HQ4EFgQUT8cBE8+x+oJuqrW2RDXVsYnVO50wSgYDVR0jBEMwQYAUT8cBE8+x+oJu
+qrW2RDXVsYnVO52hHqQcMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQYIJAJ1k
+lYLNOdCvMAwGA1UdEwQFMAMBAf8wCwYDVR0PBAQDAgEGMA0GCSqGSIb3DQEBCwUA
+A4IBAQCPIrHjXTysLIQPFLOQTo5KcOKckcN9leymcQ+5UtsX+g5kGka2+Z81Jl4A
+jRlAx4ca6wu2EjoDkvJzDKRr0SLHg6v25XRYxs2UQi16VjjcGmvgGySwQ7oO1Iom
+MmClOgIz70A0jpphqDtmmdZy1Ca02OSqNRppljRM/DIhhIIc5R57A0w5H0HdrHm6
+Hcz1Y3O1MCK53DRrnJO1OtsJ30DR6nJ4UBhE6yfRhspqdITUCnrqK2GyvdMF9V+7
+sv9wOIN9w2ssS3LiDO/p1WJWRo6Pl8HaDchkUHt3yW6rCQwZYo1dhufjBzcJOFcX
+47DPcxs9ChRLA39Fa5dSYnIB7ZpE
+-----END CERTIFICATE-----
+</ca>
+<cert>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 20 (0x14)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=DDPS.DEIC.DK CA
+        Validity
+            Not Before: Feb 22 11:55:28 2018 GMT
+            Not After : Feb 20 11:55:28 2028 GMT
+        Subject: CN=bootstrapped
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:cd:28:1f:c4:74:63:31:7e:a0:a4:47:1f:67:86:
+                    87:6b:47:30:25:91:76:a9:61:de:d3:9a:fc:93:5e:
+                    58:93:9a:b0:c1:4e:21:a2:87:e0:f0:6e:dd:8b:1e:
+                    38:0a:f2:97:7c:9b:5a:74:6e:66:2d:9f:43:f4:d7:
+                    35:34:a1:97:b8:59:26:00:85:9e:e7:c2:ee:ac:07:
+                    46:93:cd:eb:55:e9:e7:da:9b:e1:da:95:9a:99:a2:
+                    63:5f:cf:bb:3e:d3:96:f6:51:e1:44:2f:c7:c0:05:
+                    73:13:f0:5f:2e:4e:17:f1:dc:b1:4d:dd:0c:c6:c4:
+                    0d:95:b7:fa:fd:7b:69:f6:2a:fe:9a:17:b2:ff:2b:
+                    b2:35:a4:ea:4d:95:3d:57:64:c0:4b:3e:7f:5e:34:
+                    33:4b:cd:c8:f4:01:2b:77:08:c5:d9:df:ba:aa:b2:
+                    4c:23:db:04:e5:eb:53:94:b3:ae:dc:3a:84:df:c8:
+                    78:34:ec:91:75:4d:1b:e9:65:df:d8:bf:a0:95:0a:
+                    9d:ca:b1:68:59:6a:5a:b1:e2:9f:0b:f4:0d:4c:cd:
+                    70:bb:cb:e8:77:53:eb:57:d4:98:7f:d9:a9:a4:3b:
+                    8e:e4:55:65:0e:8b:1f:85:8c:da:c1:bc:eb:c8:22:
+                    39:47:ad:9e:9f:7f:2b:36:d6:40:00:68:d2:f6:1f:
+                    d5:43
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints:
+                CA:FALSE
+            X509v3 Subject Key Identifier:
+                47:3B:1E:39:7F:6F:08:70:22:EE:2C:4A:AE:11:B7:DB:A2:D1:4A:76
+            X509v3 Authority Key Identifier:
+                keyid:4F:C7:01:13:CF:B1:FA:82:6E:AA:B5:B6:44:35:D5:B1:89:D5:3B:9D
+                DirName:/CN=DDPS.DEIC.DK CA
+                serial:9D:64:95:82:CD:39:D0:AF
+
+            X509v3 Extended Key Usage:
+                TLS Web Client Authentication
+            X509v3 Key Usage:
+                Digital Signature
+    Signature Algorithm: sha256WithRSAEncryption
+         8a:cc:4f:a5:3c:b9:94:d5:6f:91:fe:c7:c1:e4:13:ff:e6:00:
+         09:e6:9e:2c:5b:99:5d:d5:57:6d:90:77:0f:34:1e:d6:c0:cb:
+         6c:e1:ff:f4:42:c4:23:db:9b:6c:6f:26:9e:ff:c8:9e:a6:76:
+         40:cf:38:85:23:6d:1d:bf:5d:52:37:8d:81:da:02:11:02:7b:
+         59:46:5c:59:6e:0e:f2:fc:f7:ee:8b:2c:90:3c:dc:02:9a:2d:
+         25:dd:49:db:b1:ba:d9:a6:02:68:2b:e0:83:8f:0a:45:a7:b7:
+         5e:ae:a0:60:26:06:3f:a1:0a:35:5e:de:2d:32:b5:30:a0:2b:
+         40:6f:9c:7e:7f:bf:96:43:26:3f:09:fc:6d:c0:93:2d:4a:01:
+         27:42:b8:3b:5d:36:a9:47:d4:f8:9d:1f:f6:04:6b:6f:67:b4:
+         a5:6a:0f:c6:3b:bf:3e:26:1a:60:e3:3a:dc:df:e4:a9:0e:85:
+         8f:a1:42:ce:87:66:dd:00:02:c9:50:08:89:5c:7e:34:0e:62:
+         2f:ee:e2:51:ab:13:b1:3b:df:ce:53:b6:d9:79:fb:81:44:19:
+         2f:1c:fd:7c:34:3d:f6:9a:a1:71:09:b2:b3:b1:50:59:af:a5:
+         c9:6b:19:ee:1d:61:1e:fa:3d:4e:e3:6d:45:9c:da:7a:2c:46:
+         c2:c6:d6:53
+-----BEGIN CERTIFICATE-----
+MIIDSDCCAjCgAwIBAgIBFDANBgkqhkiG9w0BAQsFADAaMRgwFgYDVQQDDA9ERFBT
+LkRFSUMuREsgQ0EwHhcNMTgwMjIyMTE1NTI4WhcNMjgwMjIwMTE1NTI4WjAXMRUw
+EwYDVQQDDAxib290c3RyYXBwZWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDNKB/EdGMxfqCkRx9nhodrRzAlkXapYd7TmvyTXliTmrDBTiGih+Dwbt2L
+HjgK8pd8m1p0bmYtn0P01zU0oZe4WSYAhZ7nwu6sB0aTzetV6efam+HalZqZomNf
+z7s+05b2UeFEL8fABXMT8F8uThfx3LFN3QzGxA2Vt/r9e2n2Kv6aF7L/K7I1pOpN
+lT1XZMBLPn9eNDNLzcj0ASt3CMXZ37qqskwj2wTl61OUs67cOoTfyHg07JF1TRvp
+Zd/Yv6CVCp3KsWhZalqx4p8L9A1MzXC7y+h3U+tX1Jh/2amkO47kVWUOix+FjNrB
+vOvIIjlHrZ6ffys21kAAaNL2H9VDAgMBAAGjgZswgZgwCQYDVR0TBAIwADAdBgNV
+HQ4EFgQURzseOX9vCHAi7ixKrhG326LRSnYwSgYDVR0jBEMwQYAUT8cBE8+x+oJu
+qrW2RDXVsYnVO52hHqQcMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQYIJAJ1k
+lYLNOdCvMBMGA1UdJQQMMAoGCCsGAQUFBwMCMAsGA1UdDwQEAwIHgDANBgkqhkiG
+9w0BAQsFAAOCAQEAisxPpTy5lNVvkf7HweQT/+YACeaeLFuZXdVXbZB3DzQe1sDL
+bOH/9ELEI9ubbG8mnv/InqZ2QM84hSNtHb9dUjeNgdoCEQJ7WUZcWW4O8vz37oss
+kDzcApotJd1J27G62aYCaCvgg48KRae3Xq6gYCYGP6EKNV7eLTK1MKArQG+cfn+/
+lkMmPwn8bcCTLUoBJ0K4O102qUfU+J0f9gRrb2e0pWoPxju/PiYaYOM63N/kqQ6F
+j6FCzodm3QACyVAIiVx+NA5iL+7iUasTsTvfzlO22Xn7gUQZLxz9fDQ99pqhcQmy
+s7FQWa+lyWsZ7h1hHvo9TuNtRZzaeixGwsbWUw==
+-----END CERTIFICATE-----
+</cert>
+<key>
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDNKB/EdGMxfqCk
+Rx9nhodrRzAlkXapYd7TmvyTXliTmrDBTiGih+Dwbt2LHjgK8pd8m1p0bmYtn0P0
+1zU0oZe4WSYAhZ7nwu6sB0aTzetV6efam+HalZqZomNfz7s+05b2UeFEL8fABXMT
+8F8uThfx3LFN3QzGxA2Vt/r9e2n2Kv6aF7L/K7I1pOpNlT1XZMBLPn9eNDNLzcj0
+ASt3CMXZ37qqskwj2wTl61OUs67cOoTfyHg07JF1TRvpZd/Yv6CVCp3KsWhZalqx
+4p8L9A1MzXC7y+h3U+tX1Jh/2amkO47kVWUOix+FjNrBvOvIIjlHrZ6ffys21kAA
+aNL2H9VDAgMBAAECggEAAT7zInBKgexw8U51RF2uyNn/0tqVS+YKQmK4kfSKuSrB
+VAszbRdCKHOj6MpgMMDUZq9S104sVK6Y7Q25hv5MO5RfBLXLB0FJzcWlihRAD5+C
+BvPXZUpvS+uOivBqBLGoQwqwQYfAwMvHrSFSkqdqwc9DTGPBRhu+sWASqCNtu074
+vxBHryPShK96Inxwv4OsccBq6XB395RDx4zDvXkCLlv25Y/B4iYDCgXU4i/ueE2n
+HVXnmfY3fpXF2+mklNl3rCXjTMaAFiZGv3lq8jN6pMc1sShrSg1M2RViZ/4qIDjH
+uD/7OvgXVusKpOLTNZwBcwFwUwp+LSdzBYCv3FLOMQKBgQDy6DgLx74M4KtO6Xam
+wEVL/0SUV6gLG+IcOM9fnNYlVDf7dS1mMv0VpsUizNbVL3jKrZ8jymHK6fYG/wRY
+zDVHEwa2HggJaRmjsuC8iddHm3aK+l0L+Pus1M/MZaEF5gNzKzq4rWc4pxLBJqjx
+MycWZpLxjmdBz6fJQCaUxE31zQKBgQDYNwCelafBTou7k1j4Y2TyvKC6O7CPEi77
+UqS+1dtfUhq3y5xpN7AlQSl3hbr6+JPKSKleyyQ18rnZ8SIsrplze92qyRdzGoi9
+lrMkXIhKB5/r84hNZYX6FYXEyM8TagSwSWB5mOSrC0HHUhfG2GFesO9eSSu2LD8T
+FVnO6VnnTwKBgQDQfFQueEA82VDvqB54vSo9MlnwYNQQxNvrkS8cR4bd/00VfNt8
+jmL/BGbLmbkCvX4Vp7OhioEpImpSUuuuM4e++yuVgG0xdo3VHSEbccve4CZ83qqi
+LhAFpZq9OrVcVLG9VetOuzaPP4cvVTlH3Lm91khlH+6sY8kFSRRUN7EaOQKBgQDS
+dufhdqfvITgfhNTMJGR1bGvAHK5G9lpJRi8bnCyIYvGjC03bldueyAlHUSOrfSDP
+fV9w6Kj84qNKpNCxUdwJb/9caZar8p48fl8u++umtDlVgp+hRzvdLeoinZ4EteSO
+fT6t3shoPvLuxNhkNOjDNdQroWotUHCtcNEU+k0LPQKBgQC3246RPA6yTIgSKOud
+GBDDcNGWlLo0Jl78DAhERG/IkDNEA5jU+EcvGIvxu1j9+TMHyjOL6Clg8MooI6GB
+1sThziSkBFx/QymUbJ8K/ahekHiP2mQtn5ml6SoOrsucs5/45vcLINqhvGfeyFGK
+WWldle4vh+jWKXzGt6nMXaAz7g==
+-----END PRIVATE KEY-----
+</key>
+EOF
+
+## Make the first time script executable
+chmod 555 /usr/local/etc/rc.d/rc.firsttime.sh
+
+# influxdb users should be added by now
+if [ -d /var/db/influxdb ]; then
+    chown -R influxd:influxd /var/db/influxdb
+fi
+
+## add ssh keys 
+test -d /root/.ssh || mkdir /root/.ssh
+cat << EOF >> /root/.ssh/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICh0o+Zu/Tv2zgWib3F0YsaBz03NnzQRC17oZ5syENot uninth@macnth.local
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDBGQPRnLs10W+O9YLvrrjDrSUuXZZvrDiV+H7hhe0Cr uninth@www.ddps.deic.dk
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMtUSWelww/d4J+eN+Nn1EUoxWlQdkd2/55Rqo+q96S4 root@ww1.ddps.deic.dk
+EOF
+
+# Modify default sshd config
+awk '
+      $1 ~ /PermitRootLogin/ { print $0; print "PermitRootLogin prohibit-password"; next }
+      $1 ~ /TCPKeepAlive/ { print $0; print "TCPKeepAlive yes"; next }
+      $1 ~ /ChallengeResponseAuthentication/ { print $0; print "ChallengeResponseAuthentication no"; next }
+      $1 ~ /PasswordAuthentication/ { print $0; print "PasswordAuthentication no"; next }
+      { print ; next }
+' /etc/ssh/sshd_config > /tmp/sshd_config
+/bin/mv /etc/ssh/sshd_config /etc/ssh/sshd_config.org
+/bin/mv /tmp/sshd_config /etc/ssh/sshd_config
+
+# set initial pw for root
+# echo '$6$axcoKK1iNwME8ly/$WcdZD8CFZHd.nXKpMBEAictr64Ia3anltT4LyXbHssSRnqmAYF6mYw6Epo7zJCb6hjApzNg7hirYi4PAf3mI10' |pw usermod root -H 0
+echo '1qazxsw2' |pw usermod root -h 0
+# add user with 'su' rights
+pw groupadd -n sysadm -g 1001
+echo '$6$MtynC604h4yOULw4$165LUXRPcENThMAUbSHtpjp2VOY34iyk1RCoY.0eqb6FqZZyMscq7yTlout0fAusPEnv7OlQl1zkoQmCe1WWU.' |pw useradd -n sysadm -m -u 1001 -g 1001 -s /usr/local/bin/bash -H 0
+pw groupmod wheel -m sysadm
+
+mkdir -p /usr/home/sysadm/.ssh
+/bin/cp /root/.ssh/authorized_keys /usr/home/sysadm/.ssh/authorized_keys
+chown -R sysadm:sysadm /usr/home/sysadm/
+
+# ix0 10Gb
+# igb0 1Gb
+# em0  1Gb
+
+# list interfaces one interface pr. line, use numeric sort to have ix before igb before em and exclude virtual interfaces
+real_interfaces=`ifconfig -a| egrep '^[a-z0-9]*:'|sed 's/:.*//; /lo0/d; /tun/d'|sort -n`
+fnm_interface=""
+for interface in ${real_interfaces} igb0 igb1 ix0 ix1 ix2 ix3; do                               # append 10Gb last for testing
+	ifconfig $interface >/dev/null 2>&1
+	case $? in
+	0)	used=`ifconfig $interface|sed '/inet/!d; /0.0.0.0/d;'|wc -l | tr -d ' ' `
+		if [ $used -eq 0 ]; then
+			fnm_interface=$interface
+		fi
+	;;
+	*)	: # no such interface
+	;;
+	esac
+done
+
+sleep 20
+internet_interface=`netstat -rn -f inet | awk '$0 ~ /default/ { print $NF }'`
+
+echo 'output from ifconfig -a'    >> /root/network-information.txt   2>&1
+ifconfig -a                       >> /root/network-information.txt   2>&1
+echo 'netstat -rn -f inet'        >> /root/network-information.txt   2>&1
+netstat -rn -f inet               >> /root/network-information.txt   2>&1
+
+cat << EOF > /etc/rc.conf.new
+keymap="dk"
+ifconfig_$internet_interface="DHCP"
+ifconfig_$fnm_interface="up promisc -rxcsum -txcsum -rxcsum6 -txcsum6 -vlanhwtag -vlanhwfilter -vlanhwtso -tso -tso4 -tso6 -lro -vlanhwcsum"
+openvpn_enable="YES"
+openvpn_configfile="/usr/local/etc/openvpn/openvpn.conf"
+sshd_enable="YES"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+sendmail_enable="NONE"
+dumpdev="NO"
+influxd_enable="YES"
+influxd_conf="/usr/local/etc/influxd.conf"
+fastnetmon_enable="YES"
+fastnetmon_flags="--daemonize --configuration_file /usr/local/etc/fastnetmon.conf"
+fastnetmon_user="root"
+EOF
+
+# fastnetmon,influxd etc.
+
+cat <<'EOF' | sed 's/^interfaces.*=.*/interfaces = $fnm_interface/g' >> /usr/local/etc/fastnetmon.conf.new
+###
+### Main configuration params
+###
+
+### Logging configuration
+
+# enable this option if you want to send logs to local syslog facility
+logging:local_syslog_logging = off
+
+# enable this option if you want to send logs to a remote syslog server via UDP
+logging:remote_syslog_logging = off
+
+# specify a custom server and port for remote logging
+logging:remote_syslog_server = 10.10.10.10
+logging:remote_syslog_port = 514
+
+# Enable/Disable any actions in case of attack
+enable_ban = on
+
+# disable processing for certain direction of traffic
+process_incoming_traffic = on
+process_outgoing_traffic = off
+
+# How many packets will be collected from attack traffic
+ban_details_records_count = 500
+
+# How long (in seconds) we should keep an IP in blocked state
+# If you set 0 here it completely disables unban capability
+ban_time = 300
+
+# Check if the attack is still active, before triggering an unban callback with this option
+# If the attack is still active, check each run of the unban watchdog
+unban_only_if_attack_finished = off
+
+# enable per subnet speed meters
+# For each subnet, list track speed in bps and pps for both directions
+enable_subnet_counters = on
+
+# list of all your networks in CIDR format
+networks_list_path = /usr/local/etc/networks_list
+
+# list networks in CIDR format which will be not monitored for attacks
+white_list_path = /usr/local/etc/networks_whitelist
+
+# redraw period for client's screen
+check_period = 1
+
+# Connection tracking is very useful for attack detection because it provides huge amounts of information,
+# but it's very CPU intensive and not recommended in big networks
+enable_connection_tracking = on
+
+# Different approaches to attack detection
+ban_for_pps = on
+ban_for_bandwidth = on
+ban_for_flows = on
+
+# Limits for Dos/DDoS attacks
+threshold_pps = 2000
+threshold_mbps = 1000
+threshold_flows = 3500
+
+# Per protocol attack thresholds
+# We don't implement per protocol flow limits, sorry :(
+# These limits should be smaller than global pps/mbps limits
+
+threshold_tcp_mbps = 10000
+threshold_udp_mbps = 5000
+threshold_icmp_mbps = 100
+
+threshold_tcp_pps = 10000
+threshold_udp_pps = 5000
+threshold_icmp_pps = 100
+
+ban_for_tcp_bandwidth = on
+ban_for_udp_bandwidth = on
+ban_for_icmp_bandwidth = on
+
+ban_for_tcp_pps = on
+ban_for_udp_pps = on
+ban_for_icmp_pps = on
+
+###
+### Traffic capture methods
+###
+
+# PF_RING traffic capture, fast enough but the wirespeed version needs a paid license
+mirror = off
+
+# Port mirroring sample rate
+pfring_sampling_ratio = 1
+
+# Netmap traffic capture (very fast but needs patched drivers)
+mirror_netmap = on
+
+# SnabbSwitch traffic capture
+mirror_snabbswitch = off
+
+# AF_PACKET capture engine
+# Please use it only with modern Linux kernels (3.6 and more)
+# And please install birq for irq ditribution over cores
+mirror_afpacket = off
+
+# use PCI-e addresses here instead of OS device names. You can find them in "lspci" output
+interfaces_snabbswitch = 0000:04:00.0,0000:04:00.1,0000:03:00.0,0000:03:00.1
+
+# Port mirroring sampling ratio
+netmap_sampling_ratio = 1
+
+# This option should be enabled if you are using Juniper with mirroring of the first X bytes of packet: maximum-packet-length 110;
+netmap_read_packet_length_from_ip_header = on
+
+# Pcap mode, very slow and thus not suitable for production
+pcap = off
+# Netflow capture method with v5, v9 and IPFIX support
+netflow = off
+# sFLOW capture suitable for switches
+sflow = off
+
+# PF_RING configuration
+# If you have a license for PF_RING ZC, enable this mode and it might achieve wire speed for 10GE
+enable_pf_ring_zc_mode = off
+
+# Configuration for netmap, mirror, pcap modes
+# For pcap and PF_RING we could specify "any"
+# For netmap and PF_RING we could specify multiple interfaces separated by comma
+interfaces = em2
+
+# We use average values for traffic speed to certain IP and we calculate average over this time slice
+average_calculation_time = 5
+
+# We use average values for traffic speed for subnet and we calculate average over this time slice
+average_calculation_time_for_subnets = 20
+
+# Netflow configuration
+
+# it's possible to specify multiple ports here, using commas as delimiter
+netflow_port = 2055
+netflow_host = 0.0.0.0
+
+# To bind to all interfaces for all protocols:       not possible yet
+# To bind to all interfaces for a specific protocol: ::  or 0.0.0.0
+# To bind to localhost for a specific protocol:      ::1 or 127.0.0.1
+
+# Netflow v9 and IPFIX agents use different and very complex approaches for notifying about sample ratio
+# Here you could specify a sampling ratio for all this agents
+# For NetFLOW v5 we extract sampling ratio from packets directely and this option not used
+netflow_sampling_ratio = 1
+
+# In some cases with NetFlow we could get huge bursts related to aggregated data nature
+# We could try to get smoother data with this option, i.e. we will divide counters on collection interval time
+netflow_divide_counters_on_interval_length = off
+
+# Process each netflow packet with LUA
+# This option is not default and you need build it additionally
+# netflow_lua_hooks_path = /usr/src/fastnetmon/src/netflow_hooks.lua
+
+# sFLOW configuration
+
+# It's possible to specify multiple ports here, using commas as delimiter
+sflow_port = 6343
+# sflow_port = 6343,6344
+sflow_host = 0.0.0.0
+
+# process each sFLOW packet with LUA
+# This option is not default and you need build it additionally
+# sflow_lua_hooks_path = /usr/src/fastnetmon/src/sflow_hooks.lua
+
+###
+### Actions when attack detected
+###
+
+# This script executed for ban, unban and attack detail collection
+notify_script_path = /usr/local/bin/notify_about_attack.sh
+
+# pass attack details to notify_script via stdin
+# Pass details only in case of "ban" call
+# No details will be passed for "unban" call
+notify_script_pass_details = off
+
+# collect a full dump of the attack with full payload in pcap compatible format
+collect_attack_pcap_dumps = off
+
+# Execute Deep Packet Inspection on captured PCAP packets
+process_pcap_attack_dumps_with_dpi = off
+
+# Save attack details to Redis
+redis_enabled = off
+
+# Redis configuration
+redis_port = 6379
+redis_host = 127.0.0.1
+
+# specify a custom prefix here
+redis_prefix = mydc1
+
+# We could store attack information to MongoDB
+mongodb_enabled = off
+mongodb_host = localhost
+mongodb_port = 27017
+mongodb_database_name = fastnetmon
+
+# If you are using PF_RING non ZC version you could block traffic on host with hardware filters
+# Please be aware! We can not remove blocks with this action plugin
+pfring_hardware_filters_enabled = off
+
+# announce blocked IPs with BGP protocol with ExaBGP
+exabgp = off
+exabgp_command_pipe = /var/run/fastnetmon/exabgp.cmd
+exabgp_community = 65001:666
+
+# specify multiple communities with this syntax:
+# exabgp_community = [65001:666 65001:777]
+
+# specify different communities for host and subnet announces
+# exabgp_community_subnet = 65001:667
+# exabgp_community_host = 65001:668
+
+exabgp_next_hop = 10.0.3.114
+
+# In complex cases you could have both options enabled and announce host and subnet simultaneously
+
+# Announce /32 host itself with BGP
+exabgp_announce_host = on
+
+# Announce origin subnet of IP address instead IP itself
+exabgp_announce_whole_subnet = off
+
+# Announce Flow Spec rules when we could detect certain attack type
+# Please we aware! Flow Spec announce triggered when we collect some details about attack,
+# i.e. when we call attack_details script
+# Please disable exabgp_announce_host and exabgp_announce_whole_subnet if you want to use this feature
+# Please use ExaBGP v4 only (Git version), for more details: https://github.com/FastVPSEestiOu/fastnetmon/blob/master/docs/BGP_FLOW_SPEC.md
+exabgp_flow_spec_announces = off
+
+# GoBGP intergation
+gobgp = off
+gobgp_next_hop = 0.0.0.0
+gobgp_announce_host = on
+gobgp_announce_whole_subnet = off
+
+# Graphite monitoring
+# InfluxDB is also supported, please check our reference:
+# https://github.com/FastVPSEestiOu/fastnetmon/blob/master/docs/INFLUXDB_INTEGRATION.md
+graphite = on
+graphite_host = 127.0.0.1
+graphite_port = 2003
+
+# Default namespace for Graphite data
+graphite_prefix = fastnetmon
+
+# Add local IP addresses and aliases to monitoring list
+# Works only for Linux
+#monitor_local_ip_addresses = on
+
+# Create group of hosts with non-standard thresholds
+# You should create this group before (in configuration file) specifying any limits
+#hostgroup = my_hosts:10.10.10.221/32,10.10.10.222/32
+
+# Configure this group
+#my_hosts_enable_ban = off
+
+#my_hosts_ban_for_pps = off
+#my_hosts_ban_for_bandwidth = off
+#my_hosts_ban_for_flows = off
+
+#my_hosts_threshold_pps = 20000
+#my_hosts_threshold_mbps = 1000
+#my_hosts_threshold_flows = 3500
+
+# Path to pid file for checking "if another copy of tool is running", it's useful when you run multiple instances of tool
+pid_path = /var/run/fastnetmon/fastnetmon.pid
+
+# Path to file where we store information for fastnetmon_client
+cli_stats_file_path = /tmp/fastnetmon.dat
+
+# Enable gRPC api (required for fastnetmon_api_client tool)
+enable_api = off
+
+###
+### Client configuration
+###
+
+# Field used for sorting in client, valid values are: packets, bytes or flows
+sort_parameter = packets
+# How much IPs will be listed for incoming and outgoing channel eaters
+max_ips_in_list = 10
+EOF 
+
+# this is wrong but will work for now
+cat << EOF > /usr/local/etc/networks_list
+192.168.66.0/24
+EOF
+
+# whitelist DDPS and SSI addresses
+cat << EOF > /usr/local/etc/networks_whitelist
+130.225.242.203/29
+130.225.245.208/29
+130.225.245.42/32
+EOF
+
+cat <<'END_OF_INFLUXD_CONFIG_FILE' > /usr/local/etc/influxd.conf
+### Welcome to the InfluxDB configuration file.
+
+# The values in this file override the default values used by the system if
+# a config option is not specified. The commented out lines are the configuration
+# field and the default value used. Uncommenting a line and changing the value
+# will change the value used at runtime when the process is restarted.
+
+# Once every 24 hours InfluxDB will report usage data to usage.influxdata.com
+# The data includes a random ID, os, arch, version, the number of series and other
+# usage data. No data from user databases is ever transmitted.
+# Change this option to true to disable reporting.
+reporting-disabled = true
+
+# Bind address to use for the RPC service for backup and restore.
+# bind-address = "127.0.0.1:8088"
+
+###
+### [meta]
+###
+### Controls the parameters for the Raft consensus group that stores metadata
+### about the InfluxDB cluster.
+###
+
+[meta]
+  # Where the metadata/raft database is stored
+  dir = "/var/db/influxdb/meta"
+
+  # Automatically create a default retention policy when creating a database.
+  retention-autocreate = true
+
+  # If log messages are printed for the meta service
+  logging-enabled = true
+  pprof-enabled = false
+
+###
+### [data]
+###
+### Controls where the actual shard data for InfluxDB lives and how it is
+### flushed from the WAL. "dir" may need to be changed to a suitable place
+### for your system, but the WAL settings are an advanced configuration. The
+### defaults should work for most systems.
+###
+
+[data]
+  # The directory where the TSM storage engine stores TSM files.
+  dir = "/var/db/influxdb/data"
+
+  # The directory where the TSM storage engine stores WAL files.
+  wal-dir = "/var/db/influxdb/wal"
+  wal-logging-enabled = true
+
+  # The amount of time that a write will wait before fsyncing.  A duration
+  # greater than 0 can be used to batch up multiple fsync calls.  This is useful for slower
+  # disks or when WAL write contention is seen.  A value of 0s fsyncs every write to the WAL.
+  # Values in the range of 0-100ms are recommended for non-SSD disks.
+  # wal-fsync-delay = "0s"
+
+
+  # The type of shard index to use for new shards.  The default is an in-memory index that is
+  # recreated at startup.  A value of "tsi1" will use a disk based index that supports higher
+  # cardinality datasets.
+  # index-version = "inmem"
+
+  # Trace logging provides more verbose output around the tsm engine. Turning
+  # this on can provide more useful output for debugging tsm engine issues.
+  # trace-logging-enabled = false
+
+  # Whether queries should be logged before execution. Very useful for troubleshooting, but will
+  # log any sensitive data contained within a query.
+  # query-log-enabled = true
+
+  # Settings for the TSM engine
+
+  # CacheMaxMemorySize is the maximum size a shard's cache can
+  # reach before it starts rejecting writes.
+  # Valid size suffixes are k, m, or g (case insensitive, 1024 = 1k).
+  # Vaues without a size suffix are in bytes.
+  # cache-max-memory-size = "1g"
+
+  # CacheSnapshotMemorySize is the size at which the engine will
+  # snapshot the cache and write it to a TSM file, freeing up memory
+  # Valid size suffixes are k, m, or g (case insensitive, 1024 = 1k).
+  # Values without a size suffix are in bytes.
+  # cache-snapshot-memory-size = "25m"
+
+  # CacheSnapshotWriteColdDuration is the length of time at
+  # which the engine will snapshot the cache and write it to
+  # a new TSM file if the shard hasn't received writes or deletes
+  # cache-snapshot-write-cold-duration = "10m"
+
+  # CompactFullWriteColdDuration is the duration at which the engine
+  # will compact all TSM files in a shard if it hasn't received a
+  # write or delete
+  # compact-full-write-cold-duration = "4h"
+
+  # The maximum number of concurrent full and level compactions that can run at one time.  A
+  # value of 0 results in 50% of runtime.GOMAXPROCS(0) used at runtime.  Any number greater
+  # than 0 limits compactions to that value.  This setting does not apply
+  # to cache snapshotting.
+  # max-concurrent-compactions = 0
+
+  # The maximum series allowed per database before writes are dropped.  This limit can prevent
+  # high cardinality issues at the database level.  This limit can be disabled by setting it to
+  # 0.
+  # max-series-per-database = 1000000
+
+  # The maximum number of tag values per tag that are allowed before writes are dropped.  This limit
+  # can prevent high cardinality tag values from being written to a measurement.  This limit can be
+  # disabled by setting it to 0.
+  # max-values-per-tag = 100000
+
+###
+### [coordinator]
+###
+### Controls the clustering service configuration.
+###
+
+[coordinator]
+  # The default time a write request will wait until a "timeout" error is returned to the caller.
+  # write-timeout = "10s"
+
+  # The maximum number of concurrent queries allowed to be executing at one time.  If a query is
+  # executed and exceeds this limit, an error is returned to the caller.  This limit can be disabled
+  # by setting it to 0.
+  # max-concurrent-queries = 0
+
+  # The maximum time a query will is allowed to execute before being killed by the system.  This limit
+  # can help prevent run away queries.  Setting the value to 0 disables the limit.
+  # query-timeout = "0s"
+
+  # The time threshold when a query will be logged as a slow query.  This limit can be set to help
+  # discover slow or resource intensive queries.  Setting the value to 0 disables the slow query logging.
+  # log-queries-after = "0s"
+
+  # The maximum number of points a SELECT can process.  A value of 0 will make
+  # the maximum point count unlimited.  This will only be checked every second so queries will not
+  # be aborted immediately when hitting the limit.
+  # max-select-point = 0
+
+  # The maximum number of series a SELECT can run.  A value of 0 will make the maximum series
+  # count unlimited.
+  # max-select-series = 0
+
+  # The maxium number of group by time bucket a SELECT can create.  A value of zero will max the maximum
+  # number of buckets unlimited.
+  # max-select-buckets = 0
+
+  write-timeout = "10s"
+  max-concurrent-queries = 0
+  query-timeout = "0"
+  log-queries-after = "0"
+  max-select-point = 0
+  max-select-series = 0
+  max-select-buckets = 0
+
+###
+### [retention]
+###
+### Controls the enforcement of retention policies for evicting old data.
+###
+
+[retention]
+  # Determines whether retention policy enforcement enabled.
+  # enabled = true
+
+  # The interval of time when retention policy enforcement checks run.
+  # check-interval = "30m"
+
+###
+### [shard-precreation]
+###
+### Controls the precreation of shards, so they are available before data arrives.
+### Only shards that, after creation, will have both a start- and end-time in the
+### future, will ever be created. Shards are never precreated that would be wholly
+### or partially in the past.
+
+[shard-precreation]
+  # Determines whether shard pre-creation service is enabled.
+  # enabled = true
+
+  # The interval of time when the check to pre-create new shards runs.
+  # check-interval = "10m"
+
+  # The default period ahead of the endtime of a shard group that its successor
+  # group is created.
+  # advance-period = "30m"
+
+###
+### Controls the system self-monitoring, statistics and diagnostics.
+###
+### The internal database for monitoring data is created automatically if
+### if it does not already exist. The target retention within this database
+### is called 'monitor' and is also created with a retention period of 7 days
+### and a replication factor of 1, if it does not exist. In all cases the
+### this retention policy is configured as the default for the database.
+
+[monitor]
+  # Whether to record statistics internally.
+  # store-enabled = true
+
+  # The destination database for recorded statistics
+  # store-database = "_internal"
+
+  # The interval at which to record statistics
+  # store-interval = "10s"
+
+###
+### [http]
+###
+### Controls how the HTTP endpoints are configured. These are the primary
+### mechanism for getting data into and out of InfluxDB.
+###
+
+[http]
+  # Determines whether HTTP endpoint is enabled.
+  # enabled = true
+
+  # The bind address used by the HTTP service.
+  # bind-address = ":8086"
+
+  # Determines whether user authentication is enabled over HTTP/HTTPS.
+  # auth-enabled = false
+
+  # The default realm sent back when issuing a basic auth challenge.
+  # realm = "InfluxDB"
+
+  # Determines whether HTTP request logging is enabled.
+  # log-enabled = true
+
+  # Determines whether detailed write logging is enabled.
+  # write-tracing = false
+
+  # Determines whether the pprof endpoint is enabled.  This endpoint is used for
+  # troubleshooting and monitoring.
+  # pprof-enabled = true
+
+  # Determines whether HTTPS is enabled.
+  # https-enabled = false
+
+  # The SSL certificate to use when HTTPS is enabled.
+  # https-certificate = "/etc/ssl/influxdb.pem"
+
+  # Use a separate private key location.
+  # https-private-key = ""
+
+  # The JWT auth shared secret to validate requests using JSON web tokens.
+  # shared-secret = ""
+
+  # The default chunk size for result sets that should be chunked.
+  # max-row-limit = 0
+
+  # The maximum number of HTTP connections that may be open at once.  New connections that
+  # would exceed this limit are dropped.  Setting this value to 0 disables the limit.
+  # max-connection-limit = 0
+
+  # Enable http service over unix domain socket
+  # unix-socket-enabled = false
+
+  # The path of the unix domain socket.
+  # bind-socket = "/var/run/influxdb.sock"
+
+  # The maximum size of a client request body, in bytes. Setting this value to 0 disables the limit.
+  # max-body-size = 25000000
+
+
+###
+### [ifql]
+###
+### Configures the ifql RPC API.
+###
+
+[ifql]
+  # Determines whether the RPC service is enabled.
+  # enabled = true
+
+  # Determines whether additional logging is enabled.
+  # log-enabled = true
+
+  # The bind address used by the ifql RPC service.
+  # bind-address = ":8082"
+
+
+###
+### [subscriber]
+###
+### Controls the subscriptions, which can be used to fork a copy of all data
+### received by the InfluxDB host.
+###
+
+[subscriber]
+  # Determines whether the subscriber service is enabled.
+  # enabled = true
+
+  # The default timeout for HTTP writes to subscribers.
+  # http-timeout = "30s"
+
+  # Allows insecure HTTPS connections to subscribers.  This is useful when testing with self-
+  # signed certificates.
+  # insecure-skip-verify = false
+
+  # The path to the PEM encoded CA certs file. If the empty string, the default system certs will be used
+  # ca-certs = ""
+
+  # The number of writer goroutines processing the write channel.
+  # write-concurrency = 40
+
+  # The number of in-flight writes buffered in the write channel.
+  # write-buffer-size = 1000
+
+
+###
+### [[graphite]]
+###
+### Controls one or many listeners for Graphite data.
+###
+
+[[graphite]]
+  # Determines whether the graphite endpoint is enabled.
+  # enabled = false
+  # database = "graphite"
+  # retention-policy = ""
+  # bind-address = ":2003"
+  # protocol = "tcp"
+  # consistency-level = "one"
+
+  # These next lines control how batching works. You should have this enabled
+  # otherwise you could get dropped metrics or poor performance. Batching
+  # will buffer points in memory if you have many coming in.
+
+  # Flush if this many points get buffered
+  # batch-size = 5000
+
+  # number of batches that may be pending in memory
+  # batch-pending = 10
+
+  # Flush at least this often even if we haven't hit buffer limit
+  # batch-timeout = "1s"
+
+  # UDP Read buffer size, 0 means OS default. UDP listener will fail if set above OS max.
+  # udp-read-buffer = 0
+
+  ### This string joins multiple matching 'measurement' values providing more control over the final measurement name.
+  # separator = "."
+
+  ### Default tags that will be added to all metrics.  These can be overridden at the template level
+  ### or by tags extracted from metric
+  # tags = ["region=us-east", "zone=1c"]
+
+  enabled = true
+  bind-address = ":2003"
+  protocol = "tcp"
+  consistency-level = "one"
+  name-separator = "."
+
+  # batch-size / batch-timeout requires InfluxDB >= 0.9.3
+  batch-size = 5000 # will flush if this many points get buffered
+  batch-timeout = "1s" # will flush at least this often even if we haven't hit buffer limit
+
+  ### Each template line requires a template pattern.  It can have an optional
+  ### filter before the template and separated by spaces.  It can also have optional extra
+  ### tags following the template.  Multiple tags should be separated by commas and no spaces
+  ### similar to the line protocol format.  There can be only one default template.
+  # templates = [
+  #   "*.app env.service.resource.measurement",
+  #   # Default template
+  #   "server.*",
+  # ]
+  templates = [
+    "fastnetmon.hosts.* app.measurement.cidr.direction.function.resource",
+    "fastnetmon.networks.* app.measurement.cidr.direction.resource",
+    "fastnetmon.total.* app.measurement.direction.resource"
+  ]
+
+###
+### [collectd]
+###
+### Controls one or many listeners for collectd data.
+###
+
+[[collectd]]
+  # enabled = false
+  # bind-address = ":25826"
+  # database = "collectd"
+  # retention-policy = ""
+  #
+  # The collectd service supports either scanning a directory for multiple types
+  # db files, or specifying a single db file.
+  # typesdb = "/usr/local/share/collectd"
+  #
+  # security-level = "none"
+  # auth-file = "/etc/collectd/auth_file"
+
+  # These next lines control how batching works. You should have this enabled
+  # otherwise you could get dropped metrics or poor performance. Batching
+  # will buffer points in memory if you have many coming in.
+
+  # Flush if this many points get buffered
+  # batch-size = 5000
+
+  # Number of batches that may be pending in memory
+  # batch-pending = 10
+
+  # Flush at least this often even if we haven't hit buffer limit
+  # batch-timeout = "10s"
+
+  # UDP Read buffer size, 0 means OS default. UDP listener will fail if set above OS max.
+  # read-buffer = 0
+
+  # Multi-value plugins can be handled two ways.
+  # "split" will parse and store the multi-value plugin data into separate measurements
+  # "join" will parse and store the multi-value plugin as a single multi-value measurement.
+  # "split" is the default behavior for backward compatability with previous versions of influxdb.
+  # parse-multivalue-plugin = "split"
+###
+### [opentsdb]
+###
+### Controls one or many listeners for OpenTSDB data.
+###
+
+[[opentsdb]]
+  # enabled = false
+  # bind-address = ":4242"
+  # database = "opentsdb"
+  # retention-policy = ""
+  # consistency-level = "one"
+  # tls-enabled = false
+  # certificate= "/etc/ssl/influxdb.pem"
+
+  # Log an error for every malformed point.
+  # log-point-errors = true
+
+  # These next lines control how batching works. You should have this enabled
+  # otherwise you could get dropped metrics or poor performance. Only points
+  # metrics received over the telnet protocol undergo batching.
+
+  # Flush if this many points get buffered
+  # batch-size = 1000
+
+  # Number of batches that may be pending in memory
+  # batch-pending = 5
+
+  # Flush at least this often even if we haven't hit buffer limit
+  # batch-timeout = "1s"
+
+###
+### [[udp]]
+###
+### Controls the listeners for InfluxDB line protocol data via UDP.
+###
+
+[[udp]]
+  # enabled = false
+  # bind-address = ":8089"
+  # database = "udp"
+  # retention-policy = ""
+
+  # These next lines control how batching works. You should have this enabled
+  # otherwise you could get dropped metrics or poor performance. Batching
+  # will buffer points in memory if you have many coming in.
+
+  # Flush if this many points get buffered
+  # batch-size = 5000
+
+  # Number of batches that may be pending in memory
+  # batch-pending = 10
+
+  # Will flush at least this often even if we haven't hit buffer limit
+  # batch-timeout = "1s"
+
+  # UDP Read buffer size, 0 means OS default. UDP listener will fail if set above OS max.
+  # read-buffer = 0
+
+###
+### [continuous_queries]
+###
+### Controls how continuous queries are run within InfluxDB.
+###
+
+[continuous_queries]
+  # Determines whether the continuous query service is enabled.
+  # enabled = true
+
+  # Controls whether queries are logged when executed by the CQ service.
+  # log-enabled = true
+
+  # Controls whether queries are logged to the self-monitoring data store.
+  # query-stats-enabled = false
+
+  # interval for how often continuous queries will be checked if they need to run
+  # run-interval = "1s"
+END_OF_INFLUXD_CONFIG_FILE
+
+## Poweroff so we can remove install ISO (default is reboot)
+poweroff

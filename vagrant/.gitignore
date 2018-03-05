@@ -1,0 +1,6 @@
+.vagrant
+*.iso
+*.dmg
+**/*~
+**/*.bak
+not-on-git

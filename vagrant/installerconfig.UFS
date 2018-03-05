@@ -1,0 +1,93 @@
+# This file is used with bsdinstall(8) and loaded into a FreeBSD .iso in /etc.
+# We then create a custom FreeBSD ISO, with the following specifications. All
+# automated and without user intervention.
+
+# 1. PREAMBLE. First define variables bsdinstall(8) needs
+
+## Distribution files to install
+DISTRIBUTIONS="kernel.txz base.txz"
+
+## Variations in root disk device
+if [ -e /dev/ada0 ]; then
+  DISKSLICE=ada0
+elif [ -e /dev/da0 ]; then
+  DISKSLICE=da0
+elif [ -e /dev/vtbd0 ]; then
+  DISKSLICE=vtbd0
+else
+  echo "Unknown disk device!"
+  exit -1
+fi
+
+## You can use SIZES if you want to define the partitions, instead of a large / partition.
+## Configure sizes on partitions (very small for testing):
+#SIZES="{ 1G freebsd-ufs /, 2G freebsd-swap, 2G freebsd-ufs /var, auto freebsd-ufs /usr }"
+
+## Set PARTITONS to correcct disk device and set SIZES (if used)
+export PARTITIONS="$DISKSLICE $SIZES"
+
+
+# 2. SETUP SCRIPT. After variables are defined - scripting begins
+#!/bin/sh
+
+## /boot/loader.conf - configurations
+cat <<EOF >> /boot/loader.conf
+autoboot_delay="3"
+verbose_loading="YES"
+EOF
+
+## /etc/rc.conf - configurations
+cat <<EOF >> /etc/rc.conf
+hostname="bootstrapped"
+keymap="dk"
+ifconfig_DEFAULT="SYNCDHCP"
+sshd_enable="YES"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+sendmail_enable="NONE"
+clear_tmp_enable="YES"
+fsck_y_enable="YES"
+dumpdev="NO"
+EOF
+
+## Set Time Zone to CET (CPH)
+/usr/sbin/tzsetup Europe/Copenhagen
+
+## Create the folder /usr/local/etc/rc.d
+mkdir -p /usr/local/etc/rc.d
+chmod 755 /usr/local/etc/rc.d
+
+
+## Create a first time boot setup script that runs only once,
+## after a successful installation with the custom ISO.
+cat <<EOF > /usr/local/etc/rc.d/rc.firsttime.sh
+# REQUIRE: NETWORKING
+# BEFORE: LOGIN
+
+# FreeBSD RELEASE updates
+env PAGER=cat freebsd-update fetch
+env PAGER=cat freebsd-update install
+
+# Update packages
+env ASSUME_ALWAYS_YES=YES pkg update -f
+env ASSUME_ALWAYS_YES=YES pkg upgrade -q -y
+
+# Install packages
+env ASSUME_ALWAYS_YES=YES pkg install -q -y zsh vim-lite
+
+# Clean packages
+env ASSUME_ALWAYS_YES=YES pkg autoremove
+env ASSUME_ALWAYS_YES=YES pkg clean -a
+
+# Remove the script after first run
+/bin/rm -rf /usr/local/etc/rc.d/rc.firsttime.sh
+
+exit 0
+EOF
+
+
+# Make the first time script executable
+chmod 555 /usr/local/etc/rc.d/rc.firsttime.sh
+
+## Poweroff so we can remove install ISO (default is reboot)
+poweroff
