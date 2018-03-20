@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 #   Copyright 2017, DeiC, Niels Thomas Haugård
 #
@@ -156,9 +156,14 @@ function main()
 
     # find uplink and fastest free(no ipv4 assigned) interface for fastnetmon ...
 
+    service openvpn status|logit
     logit "detecting vpn ip address ... "
-    vpn_ip_address=`netstat -rn -f inet|awk '$1 == "default" { print $NF }'`
+    vpn_ip_device=`netstat -rn -f inet|awk '$1 == "default" { print $NF }'`
+    vpn_ip_address=`ifconfig ${vpn_ip_device}|sed '/inet6/d; /inet/!d; s/.*inet //; s/\ .*$//'`
+    assert "${vpn_ip_device} != ''" $LINENO
     assert "${vpn_ip_address} != ''" $LINENO
+
+    logit "vpn interface and address: ${vpn_ip_device} ${vpn_ip_address}"
 
     logit "stopping openvpn and detecting uplink ip address ... "
     service openvpn stop|logit
@@ -199,14 +204,15 @@ function main()
     logit "assigned vpn address: ${vpn_ip_address}"
 
     case ${BUILD_CFGS} in
-        1)  CONFIGFILES="rc.conf fastnetmon.conf influxd.conf networks_list networks_whitelist fnm2db.ini"
+        1)  CONFIGFILES="rc.conf fastnetmon.conf.tmpl networks_list.tmpl networks_whitelist fnm2db.ini.tmpl"
             SSH_KEYS="ed25519 ed25519.pub"
             OPENVPN_CONFIG="openvpn.conf"
             PKG_FILE="`echo i2dps_*txz`"
             EXPORTED_VARS="export.SH"
+            INFLUXD="influxd.conf"
 
             # only CONFIGFILES will change but all files must exist
-            REQUIRED_FILES="${CONFIGFILES} ${SSH_KEYS} ${OPENVPN_CONFIG} ${PKG_FILE} EXPORTED_VARS"
+            REQUIRED_FILES="${CONFIGFILES} ${SSH_KEYS} ${OPENVPN_CONFIG} ${PKG_FILE} ${EXPORTED_VARS} ${INFLUXD}"
             for FILE in ${REQUIRED_FILES}
             do
                 if [ ! -f ${FILE} ]; then
@@ -220,9 +226,10 @@ function main()
             logit "installing '${PKG_FILE}' ... "
             echo pkg install -y "${PKG_FILE}" 2>&1 |logit
 
-            logit "creating new config files with extension .new:"
             logit "building host specific config files ... "
 
+            logit "reading files export ./files2db.SH ... "
+            source ./files2db.SH
             logit "reading db export ./export.SH ... "
             source ./export.SH
 
@@ -244,9 +251,9 @@ function main()
             fi
             logit "building config files in ${CONFIGDIR}"
 
-            logit "/etc/rc.conf:"
-            /usr/local/bin/envsubst < rc.conf > ${CONFIGDIR}/rc.conf
-            diff "${CONFIGDIR}/rc.conf" /etc/rc.conf|logit
+            logit "/etc/rc.conf: uplink: ${uplink}, FastNetMon mirror interface: ${fastest_if} "
+            /usr/local/bin/envsubst < rc.conf.tmpl > ${CONFIGDIR}/rc.conf
+            # diff "${CONFIGDIR}/rc.conf" rc.conf|logit
 
             #cat rc.conf.tmpl| sed "
             #    s/\$internet_interface/$uplink/g
@@ -256,15 +263,16 @@ function main()
             cp influxd.conf ${CONFIGDIR}/influxd.conf
 
             logit "/usr/local/etc/influxd.conf:"
-            diff  /usr/local/etc/influxd.conf ${CONFIGDIR}/influxd.conf
+            diff  ${CONFIGDIR}/influxd.conf influxd.conf |logit
 
             # fastnetmon.conf
             # networks_list
             # networks_whitelist
+
             # fnm2db.ini
 
-
-            # finally move in place if accepted && reboot
+            logit "finally move in place if accepted && reboot .... "
+            logit "done"
 
         ;;
         *)  echo "uplink: $uplink"

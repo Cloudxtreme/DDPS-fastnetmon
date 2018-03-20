@@ -141,48 +141,48 @@ configuration files before it can go in production.
   - a specific configuration file for FastNetMon, the FastNetMon notification
     script and influxdb and specific changes to /etc/rc.conf
 
-Start by making a directory for files which must be applied to the new host by
-renaming or copying the content of `example_config` to e.g. test01.ddps.deic.dk:
+The customer owning the FastNetMon must exist in DDPS, and the network
+protected by the FastNetMon must exist as part of the customers network.
 
-    mv example_config test01.ddps.deic.dk
 
-Next
-
-  - Crate customer if not already done on DDPS
-  - create FastNetMon instance for the customer
-  - Add FastNetMon config to the database for the customer
-
-### Generating OpenVPN configuration file and SSH keys
-The configuration is made on `fw.ddps`. Execute
-
-    /root/bin/openvpn_add_clien ${client-fqdn-or-ipv4address}
-
-Add / check the IP address assigned in `/usr/local/etc/openvpn/ipp.txt`, the address
-is referred as `ipv4-vpn-address` in this text.
-
-The ssh configuration must be made with
-
-    ssh-keygen -C "hostname@ipv4-vpn-address" -N '' -t ED25519 -f ed25519
-
-Setting `hostname` and `ipv4-vpn-address`  as part of the key comment will make
-it relative easy to keep a tight __authorized_keys__ on DDPS.
-
+UD Start by making a directory for files which must be applied to the new host by
+UD renaming or copying the content of `example_config` to e.g. test01.ddps.deic.dk:
+UD 
+UD     mv example_config test01.ddps.deic.dk
+UD 
+UD Next
+UD 
+UD   - Crate customer if not already done on DDPS
+UD   - create FastNetMon instance for the customer
+UD   - Add FastNetMon config to the database for the customer
+UD 
+UD ### Generating OpenVPN configuration file and SSH keys
+UD The configuration is made on `fw.ddps`. Execute
+UD 
+UD     /root/bin/openvpn_add_clien ${client-fqdn-or-ipv4address}
+UD 
+UD Add / check the IP address assigned in `/usr/local/etc/openvpn/ipp.txt`, the address
+UD is referred as `ipv4-vpn-address` in this text.
+UD 
+UD The ssh configuration must be made with
+UD 
+UD     ssh-keygen -C "hostname@ipv4-vpn-address" -N '' -t ED25519 -f ed25519
+UD 
+UD Setting `hostname` and `ipv4-vpn-address`  as part of the key comment will make
+UD it relative easy to keep a tight __authorized_keys__ on DDPS.
+UD 
 ### Export the FastNetMon and other options from the database 
 
-Extract the information from the database  on `ww1.ddps` with
+Extract the information from the database  on `ww1.ddps` or `ww2.ddps` with
 
-    fnm-db-export.sh -p DBPASSWORD -i ipv4-vpn-address > ./test01.ddps.deic.dk/export.SH
+    fnmcfg -v -d -n fnm.deic.dk
 
-or
+Or
 
-    fnm-db-export.sh -p DBPASSWORD -n hostname > ./test01.ddps.deic.dk/export.SH
+    fnmcfg -v -d -i vpn-ipv4-address
 
-where _DBPASSWORD_ is the password for accessing the database as the user _postgres_.
 
-  - **TODO**: Export from database and build config files, export to FastNetMon.
-  - **TODO**: include addresses to networks_list
-  - **TODO**: unique_var=value format, save to e.g. `test01.ddps.deic.dk/exported.SH`
-
+Move `exported.SH` to `test01.ddps.deic.dk`.
 
 Add the new key on both `ww1.ddps` and `ww2.ddps`with
 
@@ -195,6 +195,28 @@ sudo chattr +i /home/sftpgroup/newrules/.ssh/authorized_keys
 Then copy the latest `i2dps` package from ../src to e.g.
 `test01.ddps.deic.dk/i2dps ... txz`
 
+Create template files for the configuration files where the value is
+replaced with a shell variable named the same as the var (`var = $var`), together
+with all vars exported as shell vars to `files2db.SH` with the
+command
+
+``````
+cd test01.ddps.deic.dk && ./cfg2SH_and_tmpl.pl
+``````
+
+You should now have the files
+
+  - **export.SH**: exported settings from the database
+  - **files2db.SH**: exported settings from the configuration files
+  - **fastnetmon.conf.tmpl**: configuration file with shell vars
+  - **fnm2db.ini.tmpl**: INI style configuration file with shell vars
+  - **networks_list.tmpl**: configuration file with shell vars
+  - **networks_whitelist.tmpl**: configuration file with shell vars
+
+Build the config files with
+
+
+---- HMM ----
 Build the new configuration files with
 
 ``````

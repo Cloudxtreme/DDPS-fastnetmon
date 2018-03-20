@@ -36,9 +36,9 @@ export nonInteractive="YES"
 cat <<EOF >> /boot/loader.conf
 autoboot_delay=3
 verbose_loading="YES"
-hw.usb.disable_enumeration=1
-hw.usb.no_boot_wait=1
-hw.usb.no_shutdown_wait=1
+# hw.usb.disable_enumeration=1
+# hw.usb.no_boot_wait=1
+# hw.usb.no_shutdown_wait=1
 EOF
 
 

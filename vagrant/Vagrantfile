@@ -33,12 +33,6 @@ Vagrant.configure("2") do |config|
     mount -t cd9660 /dev/md0 /mnt/freebsd-iso
     rsync -aq /mnt/freebsd-iso/ /mnt/custom-freebsd-iso
 
-    # add files to /mnt/freebsd-iso/usr/freebsd-dist
-    # cp /vagrant/i2dps_1.0-19-1.0-19.txz /mnt/freebsd-iso/usr/freebsd-dist
-    # add line to MANIFEST file
-    # sha256 i2dps_1.0-19-1.0-19.txz | awk '{ print $NF }'
-    # syntax for the rest of the MANIFES
-
     umount /mnt/freebsd-iso
     mdconfig -d -u 0
 

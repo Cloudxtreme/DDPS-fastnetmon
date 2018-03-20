@@ -1,0 +1,24 @@
+#
+# global config file -- parameters from db
+#
+[globals]
+customerid              = ${customerid}
+fastnetmoninstanceid    = ${fastnetmoninstanceid}
+administratorid         = ${administratorid}
+uuid                    = ${uuid}
+
+
+# discard | rate-limit 9600 | accept
+mode                    = ${mode}
+# minutes to block/ratelimit/... in minutes (approximately)
+blocktime               = ${blocktime}
+
+[update]
+# Send rules with sftp to user@server within sftp_timeout seconds
+# using pubkey / privkey
+server                  = ${server}
+user                    = ${user}
+sftp_timeout            = ${sftp_timeout}
+pubkey                  = ${pubkey}
+privkey                 = ${privkey}
+

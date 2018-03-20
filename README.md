@@ -2,7 +2,13 @@
 # DDPS fastnetmon installation and configuration
 
 The following describes the installation of the detection engine _fastnetmon_, _influxdb_
-and the _notify script_ as well as OpenVPN etc. on FreeBSD 11
+and the _notify script_ as well as OpenVPN etc. on FreeBSD 11.
+
+All parameters lives in a database and is exported from there to the configuration files.
+The only exception are the OpenVPN and SSH keys.
+
+A set of scripts helps to facilitate this; some must be installed on DDPS while other
+may live on your laptop during the creation of the boot image.
 
 Start with the documentation in [README for the docs directory](docs/README.md)
 

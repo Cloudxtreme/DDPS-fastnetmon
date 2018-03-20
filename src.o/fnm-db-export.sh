@@ -2,7 +2,9 @@
 
 function usage()
 {
-    echo "usage: $0 -p password < -i vpn ip address| -n hostname >"
+    echo "dump fastnetmon config as shell vars"
+    echo "usage: $0 -i vpn-ip-address"
+    echo "usage: $0 -n hostname"
     exit 0
 }
 
@@ -10,6 +12,20 @@ function usage()
 ################################################################################
 # Main
 ################################################################################
+
+if [ -f /opt/db2dps/etc/db.ini ];
+then
+    eval `egrep 'dbuser|dbpassword|dbname' /opt/db2dps/etc/db.ini | sed 's/[ \t]*//g'`
+else
+    echo file /opt/db2dps/etc/db.ini not found
+    exit 0
+fi
+
+export $dbuser
+export $dbpassword
+export $dbname
+
+dbpassword="$dbpassword"
 
 echo=/bin/echo
 case ${N}$C in
@@ -23,7 +39,7 @@ esac
 #
 # Process arguments
 #
-while getopts ai:n:p:v opt
+while getopts ai:n:v opt
 do
 case $opt in
     a)
@@ -41,10 +57,8 @@ case $opt in
          *\x
         from flow.fastnetmoninstances where hostname = '$OPTARG';"
         ;;
-	p)	PGPASSWORD=$OPTARG
-	;;
     v)
-    ;;
+        ;;
 	*)	usage
 		exit
 	;;
@@ -52,17 +66,23 @@ esac
 done
 shift `expr $OPTIND - 1`
 
-test -n "${PGPASSWORD}" || usage
+test -n "${dbpassword}" || usage
 test -n "${SQL}" || usage
 
+TMPDIR=`mktemp -d`
+cd ${TMPDIR}
 
-echo "$SQL" | PGPASSWORD="${PGPASSWORD}" psql -t -F' ' -h localhost -A -U postgres -v ON_ERROR_STOP=1 -w -d netflow |
+echo "$SQL" | PGPASSWORD="${dbpassword}" psql -t -F' ' -h localhost -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} |
 sed '
     /Expanded display is on/d
    s/ /=/g
-   s/^/export /
-   '
+   s/^/export /' > export.SH
 
+
+
+echo "In `pwd`:"
+
+ls -1
 
 exit 0
 
