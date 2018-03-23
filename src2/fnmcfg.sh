@@ -42,8 +42,7 @@
 #         -p missing but simple
 #         -g missing but simple
 #         -a missing
-#
-#
+
 
 MYNAME=`basename $0`
 MY_LOGFILE=/tmp/${MYNAME}.log
@@ -478,14 +477,142 @@ EOF
 
 function pushcfg()
 {
-    logit "TODO - not made yet: pushcfg ... "
-    logit "$SQL"
+    for FILE in ed25519	ed25519.pub fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist rc.conf
+    do
+        # check all files here
+        test -s ${FILE} || {
+            echo "file ${FILE} missing" ; exit 1
+        }
+        # check no var = ${value}
+        egrep '\$' ${FILE} && {
+            echo "file ${FILE} contains unexpanded shell: var = \${value}"
+            exit 0
+        }
+        logit "ok file ${FILE} contains data and no unexpanded shell vars"
+    done
+    # check no var = ''
+    for FILE in fastnetmon.conf fnm2db.ini rc.conf
+    do
+        OUTPUT=""
+        OUTPUT=`awk -F'=' '
+            $0 !~ /=/ { next;};
+            $1 ~ /#/ { next;};
+            {
+                gsub(/ /, "", $2);
+                if ((0 + length($2)) == 0) { print "error: " $0 }
+            }' ${FILE}`
+        if [ ! -z "${OUTPUT}" ]; then
+            logit "error in $file: parameter missing ${OUTPUT}"
+            echo "error in $file: parameter missing ${OUTPUT}"
+            exit 1
+        fi
+        logit "ok file ${FILE} has var = value for all var"
+    done
+    # check no ifconfig_=
+    egrep 'ifconfig_=' rc.conf && {
+        echo "file rc.conf does not ifconfig interface correctly: ifconfig_= ..."
+        exit 1
+    }
+    logit "rc.conf: interfaces ok"
+    TMPFILE=/tmp/$$.out
+    chmod 700 ed25519*
+    ssh-keygen -y -e -f ed25519 > ${TMPFILE} 2>&1
+    case $? in
+        0)  logit "ssh key ed25519 ok"
+            ;;
+        *)  logit "ssh key ed25519 not ok"
+            cat ${TMPFILE} | logit
+            /bin/rm -f ${TPMFILE}
+            exit
+            ;;
+    esac
+    logit "file check passed ok"
+    /bin/rm -f ${TPMFILE}
+
+    # TODO: check ssh and openvpn files are here too
+
+    mkdir -p etc opt/etc/ssh usr/local/etc/openvpn
+    /bin/mv ed25519 ed25519.pub opt/etc/ssh
+    /bin/mv fnm2db.ini opt/etc/
+    /bin/mv fastnetmon.conf influxd.conf networks_list networks_whitelist usr/local/etc/
+    /bin/mv *.ovpn usr/local/etc/openvpn/openvpn.conf
+    /bin/mv rc.conf etc/
+    chmod 744 usr/local/etc/*conf
+    tar cvfpz $vpn_ip_addr.tar.gz etc opt usr
+
+    logit "cp /opt/db2dps/etc/configs/i2dps*.txz . "
+    /bin/cp /opt/db2dps/etc/configs/i2dps*.txz .
+
+    logit "making finish.sh ... "
+    cat << 'EOF' > finish.sh
+#! /usr/bin/env bash
+
+service fastnetmon stop
+service influxd stop
+service openvpn stop
+
+# set hostname and ip configuration, wait 10 seconds for dhcp to settle down
+hostname `sed '/hostname/!d; s/.*=//;s/\"//g' /etc/rc.conf`
+/etc/rc.d/netif restart
+sleep 10
+
+# once dhcp is done, restart openvpn
+service openvpn start
+
+# restart monitor
+service influxd start
+service fastnetmon start
+
+# check vpn 
+ping -c 6 192.168.67.1
+case $? in
+    0)  : ok
+    ;;
+    *)  echo tunnel down, rollback
+    ;;
+esac
+
+# check services
+for SERVICE in influxd fastnetmon openvpn
+do
+    service ${SERVICE} status
+    case $? in
+        0)  :
+        ;;
+        *)  echo service not running
+        ;;
+    esac
+done
+
+EOF
+    chmod 555 finish.sh
+
+    ssh $bootstrap_ip "/bin/rm -fr /root/${vpn_ip_addr}/*"
+    rsync -avzH i2dps*txz $vpn_ip_addr.tar.gz finish.sh $bootstrap_ip:/root/${vpn_ip_addr}
+
+    cat << 'EOF' | sed "s/_vpn_ip_addr_/${vpn_ip_addr}/g" | ssh $bootstrap_ip /usr/local/bin/bash
+    cd /root/_vpn_ip_addr_
+    tar cvfpz bootstrapped.tar.gz /etc/rc.conf $(ls /usr/local/etc/openvpn/*) $(ls /usr/local/etc/*.conf) $(ls /opt/i2dps/etc/ssh/* /opt/i2dps/etc/fnm2db.ini 2>/dev/null )
+    ls -l bootstrapped.tar.gz
+    pkg install -y i2dps*txz
+    tar Cxvfoz / _vpn_ip_addr_.tar.gz
+    # bad permissions prevent influxd from starting
+    chmod 744               /usr/local/etc/influxd.conf
+    chown influxd:influxd   /usr/local/etc/influxd.conf
+    # put in background prevent premature exit
+    nohub bash ./finish.sh &
+EOF
+    logit "done. Wait 10 seconds then please try ssh ${vpn_ip_addr}"
 }
+
 
 function getcfg()
 {
     logit "TODO - not made yet: getcfg ... "
-    logit "$SQL"
+    # mktemp && $TMPDIR
+    # rsync --files-from=FILE $vpn_ip_addr: .
+    # ssh $vpn_ip_addr "cp file file file 
+    # scp $vpn_ip_addr 
 }
 
 
@@ -564,16 +691,23 @@ function db2cfg()
         fi
         cp /opt/db2dps/etc/configs/influxd.conf             .
 
-        for file in ${CFGFILES}
-        do
-            egrep '\${' ${file}
-            case $? in 
-                1)  logit "${file} expanded ok"
-                    ;;
-                *)  logit "${file} not expanded ok, still carries shell vars"
-                    ERRORS=1
-                    ;;
-            esac
+        # finally build rc.conf
+        # TODO fix lan_if -> fastnetmon_if in db
+        if [ -z "${fastnetmon_if}" ]; then
+            export fastnetmon_if=$lan_if
+        fi
+        envsubst < /opt/db2dps/etc/configs/rc.conf.SH   > rc.conf
+         
+            for file in ${CFGFILES}
+            do
+                egrep '\${' ${file}
+                case $? in 
+                    1)  logit "${file} expanded ok"
+                        ;;
+                    *)  logit "${file} not expanded ok, still carries shell vars"
+                        ERRORS=1
+                        ;;
+                esac
             logit "checking parameters in $file ... "
             OUTPUT=""
             OUTPUT=`awk -F'=' '
@@ -599,12 +733,12 @@ function db2cfg()
 
 function cfg2db()
 {
-    IMPORT="import.sql"
-    IMPORTSH="import.sql.SH"
+IMPORT="import.sql"
+IMPORTSH="import.sql.SH"
 
-    TMPEXPORT="tmp_export.SH"
+TMPEXPORT="tmp_export.SH"
 
-    SCHEMA="schema.sql"
+SCHEMA="schema.sql"
 
     TMPFILE=/tmp/$$.tmp
 

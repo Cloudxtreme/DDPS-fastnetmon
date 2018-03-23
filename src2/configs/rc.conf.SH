@@ -1,4 +1,5 @@
 keymap="dk"
+hostname="${hostname}"
 ifconfig_${internet_if}="DHCP"
 ifconfig_${fastnetmon_if}="up promisc -rxcsum -txcsum -rxcsum6 -txcsum6 -vlanhwtag -vlanhwfilter -vlanhwtso -tso -tso4 -tso6 -lro -vlanhwcsum"
 openvpn_enable="YES"

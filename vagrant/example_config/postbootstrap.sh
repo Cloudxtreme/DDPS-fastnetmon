@@ -16,7 +16,7 @@
 #
 
 MYNAME=`basename $0`
-MY_LOGFILE=/var/log/${MYNAME}.log
+MY_LOGFILE=~/${MYNAME}.log
 VERBOSE=FALSE
 DATADIR=/root/files/data/
 VERBOSE=FALSE

@@ -13,28 +13,44 @@ Install the scripts with
 
 ## Usage
 
+Assume the host should be owned by Netdrift, have the VPN IP address
+`192.168.67.2` and host name `fastnetmon02.vpn.ddps.deic.dk`.
+
 ### Add a new FastNetMon host
 
-Bootstrap the host, see [README.md](../vagrant/README.md). The new host
-will have the IP address `192.168.68.2`, and is accessible from `ww1` and `ww2` as root.
+Bootstrap the host, see [README.md](../vagrant/README.md).          
+Initially, the new host will have the IP address `192.168.68.2`, and is
+accessible from `ww1` and `ww2` as root.
 
-Create an OpenVPN key on `fw.ddps` with the command
+Start by creating an OpenVPN key on `fw.ddps` with the command
 
-    /root/bin/openvpn_add_clien client-fqdn-or-ipv4address
+    /root/bin/openvpn_add_client fastnetmon02.vpn.ddps.deic.dk
 
-And ssh keys with the command
-
-     ssh-keygen -C "hostname@ipv4-vpn-address" -N '' -t ED25519 -f ed25519
-
-Add the new key on both `ww1.ddps` and `ww2.ddps`with
+This will among other create the configuration file
 
 ``````
-sudo chattr -i /home/sftpgroup/newrules/.ssh/authorized_keys
-sudo vi        /home/sftpgroup/newrules/.ssh/authorized_keys
-sudo chattr +i /home/sftpgroup/newrules/.ssh/authorized_keys
+/usr/local/etc/openvpn/clients/hostname.tun1/fastnetmon02.vpn.ddps.deic.dk/fastnetmon02.vpn.ddps.deic.dk.ovpn
 ``````
 
-The _customer_ with network and administrator(s) for the enw FastNetMon host
+The IP address must be static. Add the line to `/usr/local/etc/openvpn/ipp_tun1.txt`:
+
+``````
+fastnetmon02.vpn.ddps.deic.dk,192.168.67.2
+``````
+
+Also, add the host and ip address to DNS - edit the zone and forward files in
+`/var/nsd/zones/master` on `fw1.ddps`. Restart the service with 
+
+``````
+kill -HUP `cat /var/nsd/run/nsd.pid`
+``````
+
+The configuration files will be sent to `fw2.ddps` once a day with `rdist`. It
+may be forced from `fw1.ddps` with:
+
+    cd /etc && rdist
+
+The _customer_ with network and administrator(s) for the new FastNetMon host
 must be in the database.
 
 You will need the following information in order to precede:
@@ -53,16 +69,21 @@ customerid:                 3
 
 Generate an sql file on `ww1` or `ww2` with 
 
-    fnmcfg -v -a -i ipv4-vpn-address -n hostname
+    mkdir /tmp/fastnetmon02.vpn.ddps.deic.dk    
+    cd fastnetmon02.vpn.ddps.deic.dk
+    fnmcfg -v -a -i 192.168.67.2 -n fastnetmon02.vpn.ddps.deic.dk
 
 The sql file - `add_new_fastnetmon.sql` must be edited, so at least change
-`networks_list` and `mode`. The network_list is the networks separated by
+`networks_list` and `mode`. The `network_list` is the networks separated by
 spaces which FastNetMon will monitor, while the mode must be `discard` or
-`pass`.
+`ratelimit 9600` or `accept`. Choose `accept` if traffic should not be blocked
+aka monitor mode.
+
+E.g. monitor only for the network `130.226.1.0/24`:
 
 ```````
-networks_list = '',
-mode = 'discard',
+networks_list = '130.226.1.0/24',
+mode = 'accept',
 networks_whitelist = '130.225.242.200/29 130.225.245.208/29',
 ```````
 
@@ -70,23 +91,51 @@ Add the new host to database with
 
     cat add_new_fastnetmon.sql | sudo su postgres -c "cd /tmp; psql -d netflow"
 
+Create ssh keys with the command
+
+     ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t ED25519 -f ed25519
+
+Add the new key **on both** `ww1.ddps` and `ww2.ddps`with
+
+``````
+grep fastnetmon02.vpn.ddps.deic.dk@192.168.67.2 /home/sftpgroup/newrules/.ssh/authorized_keys
+
+sudo chattr -i /home/sftpgroup/newrules/.ssh/authorized_keys
+grep fastnetmon02.vpn.ddps.deic.dk@192.168.67.2 /home/sftpgroup/newrules/.ssh/authorized_keys || \
+    cat ed25519.pub >> /home/sftpgroup/newrules/.ssh/authorized_keys
+sudo chattr +i /home/sftpgroup/newrules/.ssh/authorized_keys
+``````
+
 Once added use the database vars to create configuration files for fastnetmon,
 influxd and IP via rc.conf with
 
-    fnmcfg -v -d -n hostname
+    fnmcfg -v -d -n fastnetmon02.vpn.ddps.deic.dk
 
 Or
 
-    fnmcfg -v -d -i ipv4-vpn-address
+    fnmcfg -v -d -i 192.168.67.2
 
-The files will be written to `TMPDIR` below `/tmp`. Change to that directory
-and copy the OpenVPN config (saved as `openvpn.conf`) and the ssh keys and
-execute
+The files will be written to `TMPDIR` below `/tmp`.
 
-    fnmcfg -v -p -i ipv4-vpn-address
+Save OpenVPN and SSH files together with the configuration files from `TMPDIR` in e.g `.`.
+
+Add the latest `i2dps` package to `.` (search this repo):
+
+    pkg install -y i2dps_1.0-19-1.0-19.txz
+
+Now execute (**notice the IP address!**):
+
+    fnmcfg -v -p -i 192.168.68.2
 
 Which will preserve the existing `rc.conf` and other configuration files,
-then install the new configuration, check services, test the OpenVPN
-connectivity and ssh upload and do a rollback if one or more tests fails.
+then install the new configuration. The existing configuration file is in `/root/192.168.68.2/bootstrapped.tar.gz`
+
+It should also
+
+  - check services
+  - test the OpenVPN connectivity and
+  - ssh upload
+
+and do a rollback if one or more tests fails.
 
 

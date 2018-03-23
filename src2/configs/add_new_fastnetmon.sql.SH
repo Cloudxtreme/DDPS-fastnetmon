@@ -13,6 +13,8 @@ INSERT INTO flow.fastnetmoninstances
 UPDATE flow.fastnetmoninstances
     SET 
     networks_list = '${NETWORKS_LIST}',
+    interfaces = '${FASTEST_INTERFACE}',
+    -- discard, accept or rate-limit 9600
     mode = 'discard',
     networks_whitelist = '130.225.242.200/29 130.225.245.208/29',
     -- uuid_fastnetmoninstanceid = uuid_generate_v4(),
@@ -77,7 +79,6 @@ UPDATE flow.fastnetmoninstances
     netflow = 'off',
     sflow = 'off',
     enable_pf_ring_zc_mode = 'off',
-    interfaces = 'eth1',
     average_calculation_time = '5',
     average_calculation_time_for_subnets = '20',
     netflow_port = '2055',
