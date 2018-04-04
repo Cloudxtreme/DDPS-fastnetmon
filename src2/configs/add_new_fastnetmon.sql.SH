@@ -23,7 +23,7 @@ UPDATE flow.fastnetmoninstances
     -- administratorid = '42',
     -- internet_if = '${UPLINK}',
     -- lan_if = '${FASTEST_INTERFACE}',
-    -- vpn_ip_addr = 'i${$vpn_ip_addr}',
+    -- vpn_ip_addr = '${vpn_ip_addr}',
     -- hostname = '${HOSTNAME}',
     -- uuid = '${UUID}',
     -- fastnetmonversion = '',

@@ -11,7 +11,7 @@ Install the scripts with
 
     rsync -avzH . ww2:/tmp; ssh ww2 'cd /tmp; make install'
 
-## Usage
+## Usage - add a new FastNetMon instance
 
 Assume the host should be owned by Netdrift, have the VPN IP address
 `192.168.67.2` and host name `fastnetmon02.vpn.ddps.deic.dk`.
@@ -67,13 +67,13 @@ uuid_administratorid:       3611a271-50ae-4425-86c5-b58b04393242
 customerid:                 3
 ``````
 
-Generate an sql file on `ww1` or `ww2` with 
+Generate an SQL file on `ww1` or `ww2` with 
 
     mkdir /tmp/fastnetmon02.vpn.ddps.deic.dk    
     cd fastnetmon02.vpn.ddps.deic.dk
     fnmcfg -v -a -i 192.168.67.2 -n fastnetmon02.vpn.ddps.deic.dk
 
-The sql file - `add_new_fastnetmon.sql` must be edited, so at least change
+The SQL file - `add_new_fastnetmon.sql` must be edited, so at least change
 `networks_list` and `mode`. The `network_list` is the networks separated by
 spaces which FastNetMon will monitor, while the mode must be `discard` or
 `ratelimit 9600` or `accept`. Choose `accept` if traffic should not be blocked
@@ -115,15 +115,10 @@ Or
 
     fnmcfg -v -d -i 192.168.67.2
 
-The files will be written to `TMPDIR` below `/tmp`.
+The files will be written to `TMPDIR` below `/tmp` and moved to '.' if no files by the same name exists there.
 
-Save OpenVPN and SSH files together with the configuration files from `TMPDIR` in e.g `.`.
-
-Add the latest `i2dps` package to `.` (search this repo):
-
-    pkg install -y i2dps_1.0-19-1.0-19.txz
-
-Now execute (**notice the IP address!**):
+Save OpenVPN and SSH files together with the configuration files from `TMPDIR`
+in e.g `.`.  then execute (**notice the IP address!**):
 
     fnmcfg -v -p -i 192.168.68.2
 

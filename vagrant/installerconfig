@@ -355,12 +355,13 @@ if [ -d /var/db/influxdb ]; then
     chown -R influxd:influxd /var/db/influxdb
 fi
 
-## add ssh keys 
+## add ssh keys - if you are not here then fnmcfg will fail
 test -d /root/.ssh || mkdir /root/.ssh
 cat << EOF >> /root/.ssh/authorized_keys
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICh0o+Zu/Tv2zgWib3F0YsaBz03NnzQRC17oZ5syENot uninth@macnth.local
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDK0bEjXr/6OFRY1z9vBc68+WI1gHfCmMoGPmVVCAdEN nice@sauron.local
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICsa9ioGXpgvcw56/cwR7dPWcM9aVYrG/y4uh5dzQvZe root@fw1.ddps.deic.dk
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMtUSWelww/d4J+eN+Nn1EUoxWlQdkd2/55Rqo+q96S4 root@ww1.ddps.deic.dk
 EOF
 
 # Modify default sshd config

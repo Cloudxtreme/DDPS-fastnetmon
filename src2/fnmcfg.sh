@@ -435,6 +435,15 @@ function get_interface_information_from_bootstrap()
     # igb0 1Gb
     # em0  1Gb
 
+    OK=`ssh $bootstrap_ip 'whoami' 2>&1`
+    case $? in
+        0) logit "ssh connection to $bootstrap_ip seems ok"
+        ;;
+        *) logit "ssh connection to $bootstrap_ip failed, check keys" 
+           exit 1
+        ;;
+    esac
+
     logit "stopping openvpn and detecting uplink ... "
     cat << 'EOF' > /tmp/find_uplink.sh
     #!/bin/sh
@@ -477,7 +486,7 @@ EOF
 
 function pushcfg()
 {
-    for FILE in ed25519	ed25519.pub fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist rc.conf
+    for FILE in *.ovpn ed25519	ed25519.pub fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist rc.conf
     do
         # check all files here
         test -s ${FILE} || {
@@ -529,14 +538,12 @@ function pushcfg()
     logit "file check passed ok"
     /bin/rm -f ${TPMFILE}
 
-    # TODO: check ssh and openvpn files are here too
-
     mkdir -p etc opt/etc/ssh usr/local/etc/openvpn
-    /bin/mv ed25519 ed25519.pub opt/etc/ssh
-    /bin/mv fnm2db.ini opt/etc/
-    /bin/mv fastnetmon.conf influxd.conf networks_list networks_whitelist usr/local/etc/
-    /bin/mv *.ovpn usr/local/etc/openvpn/openvpn.conf
-    /bin/mv rc.conf etc/
+    /bin/cp ed25519 ed25519.pub opt/etc/ssh
+    /bin/cp fnm2db.ini opt/etc/
+    /bin/cp fastnetmon.conf influxd.conf networks_list networks_whitelist usr/local/etc/
+    /bin/cp *.ovpn usr/local/etc/openvpn/openvpn.conf
+    /bin/cp rc.conf etc/
     chmod 744 usr/local/etc/*conf
     tar cvfpz $vpn_ip_addr.tar.gz etc opt usr
 
@@ -584,6 +591,18 @@ do
     esac
 done
 
+# roll-back:
+# service fastnetmon stop
+# service influxd stop
+# service openvpn stop
+# tar Cxvfoz / /root/bootstrapped.tar.gz
+# hostname `sed '/hostname/!d; s/.*=//;s/\"//g' /etc/rc.conf`
+# /etc/rc.d/netif restart
+# sleep 10
+# service openvpn start
+# service influxd start
+# service fastnetmon start
+
 EOF
     chmod 555 finish.sh
 
@@ -592,8 +611,7 @@ EOF
 
     cat << 'EOF' | sed "s/_vpn_ip_addr_/${vpn_ip_addr}/g" | ssh $bootstrap_ip /usr/local/bin/bash
     cd /root/_vpn_ip_addr_
-    tar cvfpz bootstrapped.tar.gz /etc/rc.conf $(ls /usr/local/etc/openvpn/*) $(ls /usr/local/etc/*.conf) $(ls /opt/i2dps/etc/ssh/* /opt/i2dps/etc/fnm2db.ini 2>/dev/null )
-    ls -l bootstrapped.tar.gz
+    tar cvfpz /root/bootstrapped.tar.gz /etc/rc.conf $(ls /usr/local/etc/openvpn/*) $(ls /usr/local/etc/*.conf) $(ls /opt/i2dps/etc/ssh/* /opt/i2dps/etc/fnm2db.ini 2>/dev/null )
     pkg install -y i2dps*txz
     tar Cxvfoz / _vpn_ip_addr_.tar.gz
     # bad permissions prevent influxd from starting
@@ -627,6 +645,7 @@ function db2cfg()
         exit 1
     }
     logit "tmpdir: ${TMPDIR}"
+    OLDDIR=`pwd`
     cd ${TMPDIR}
 
     # Following gives var='value' -- notice lack of ending ;
@@ -661,15 +680,6 @@ function db2cfg()
 
     logit "db export saved as export.SH"
 
-    #
-    # make config files from templates
-    #
-    #logit "cp template files ... "
-    #cp /opt/db2dps/etc/configs/fastnetmon.conf.SH       .
-    #cp /opt/db2dps/etc/configs/fnm2db.ini.SH            .
-    #cp /opt/db2dps/etc/configs/networks_whitelist.SH    .
-    #cp /opt/db2dps/etc/configs/networks_list.SH         .
-    
     CFGFILES="fastnetmon.conf influxd.conf fnm2db.ini networks_whitelist networks_list"
     (
         NOW=`date +%s `
@@ -729,6 +739,22 @@ function db2cfg()
         echo "files in `pwd`:"
         ls -1
     )
+
+    cd ${OLDDIR}
+    ERROR=0
+    for file in ${CFGFILES} rc.conf
+    do
+        if [ -f ${file} ]; then
+            ERROR=1
+            echo "file $file found"
+        fi
+    done
+    logit "no existing cfg files found, moving ... "
+    for file in ${CFGFILES} rc.conf
+    do
+        mv ${TMPDIR}/${file} .
+    done
+
 }
 
 function cfg2db()
