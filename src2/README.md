@@ -117,8 +117,8 @@ Or
 
 The files will be written to `TMPDIR` below `/tmp` and moved to '.' if no files by the same name exists there.
 
-Save OpenVPN and SSH files together with the configuration files from `TMPDIR`
-in e.g `.`.  then execute (**notice the IP address!**):
+Check the OpenVPN and SSH files are in the same directory before proceeding,
+then execute (**notice the IP address!**):
 
     fnmcfg -v -p -i 192.168.68.2
 

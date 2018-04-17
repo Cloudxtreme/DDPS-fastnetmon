@@ -130,34 +130,6 @@ function assert () {
     fi  
 }
 
-logit() {
-# purpose     : Timestamp output
-# arguments   : Line og stream
-# return value: None
-# see also    :
-    LOGIT_NOW="`date '+%H:%M:%S (%d/%m)'`"
-    STRING="$*"
-
-    if [ -n "${STRING}" ]; then
-        $echo "${LOGIT_NOW} ${STRING}" >> ${MY_LOGFILE}
-        if [ "${VERBOSE}" = "TRUE" ]; then
-            $echo "${LOGIT_NOW} ${STRING}"
-        fi
-    else
-        while read LINE
-        do
-            if [ -n "${LINE}" ]; then
-                $echo "${LOGIT_NOW} ${LINE}" >> ${MY_LOGFILE}
-                if [ "${VERBOSE}" = "TRUE" ]; then
-                    $echo "${LOGIT_NOW} ${LINE}"
-                fi
-            else
-                $echo "" >> ${MY_LOGFILE}
-            fi
-        done
-    fi
-}
-
 usage() {
 # purpose     : Script usage
 # arguments   : none
@@ -486,7 +458,7 @@ EOF
 
 function pushcfg()
 {
-    for FILE in *.ovpn ed25519	ed25519.pub fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist rc.conf
+    for FILE in *.ovpn id_ed25519	id_ed25519.pub fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist rc.conf
     do
         # check all files here
         test -s ${FILE} || {
@@ -623,6 +595,76 @@ EOF
     logit "done. Wait 10 seconds then please try ssh ${vpn_ip_addr}"
 }
 
+function updatecfg()
+{
+    # assume we are in a empty directory
+
+    # export and check the data
+    db2cfg
+
+    # do not push rc.conf nor ovpn or ssh
+    FILES="fastnetmon.conf fnm2db.ini influxd.conf networks_list networks_whitelist"
+
+    for FILE in ${FILES}
+    do
+        # check all files here
+        test -s ${FILE} || {
+            echo "file ${FILE} missing" ; exit 1
+        }
+    done
+
+    # I don't know any safe way of validating fastnetmon.conf; you may do 'echo asdfsadfsadf'>> fastnetmon.conf
+    # and it doesn't complain. Hmpf. In case of error of some sort, notify operator via status, don't do a rollback
+    # as the db and files should be in sync
+    # copy fastnetmon.conf influxd.conf networks_list networks_whitelist to /usr/local/etc
+    # copy fnm2db.ini to /opt/i2dps/etc
+    # service fastnetmon restart; service influxd restart
+    # check output and update status
+
+    # remove files
+    # connect_to
+    test -n $vpn_ip_addr && connect_to=$vpn_ip_addr
+    test -n $HOSTNAME && connect_to=$HOSTNAME
+
+    ERRORS=0
+    logit "applying fastnetmon configuration changes on $connect_to ... "
+    RTMPDIR=`mktemp -u`
+    ssh ${connect_to} "mkdir -p ${RTMPDIR}"
+    scp ${FILES} ${connect_to}:${RTMPDIR}
+
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon stop";   ERRORS=$((ERRORS + $?))
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd stop";      ERRORS=$((ERRORS + $?))
+
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon status"
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd status"
+
+    #ssh  -qt ${connect_to} " sync; sync; sync"
+
+    #ssh  -qt ${connect_to} "cd ${RTMPDIR}; mv influxd.conf fastnetmon.conf networks_list networks_whitelist /usr/local/etc/"
+    ssh  -qt ${connect_to} "cd ${RTMPDIR}; mv fastnetmon.conf networks_list networks_whitelist /usr/local/etc/"
+
+    #ssh  -qt ${connect_to} "chown influxd:influxd /usr/local/etc/influxd.conf"
+    #ssh  -qt ${connect_to} " sync; sync; sync"
+
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd start";     ERRORS=$((ERRORS + $?))
+    #ssh  -qt ${connect_to} " sync; sync; sync"
+
+    logit "starting fastnetmon ... "
+    ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon restart";  ERRORS=$((ERRORS + $?))
+
+    ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon status"; ERRORS=$((ERRORS + $?))
+    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd status";    ERRORS=$((ERRORS + $?))
+
+    case $ERRORS in
+        0)  STATUS="SUCCESS"
+            logit "fastnetmon successfully restarted with new configuration"
+            ;;
+        *)  STATUS="FAIL"
+            logit "fastnetmon failed restart with new configuration"
+        ;;
+    esac
+    echo "status = $STATUS"
+}
 
 function getcfg()
 {
@@ -656,7 +698,8 @@ function db2cfg()
 
     echo "$SQL" |
         PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} |
-        sed '/Expanded display is on/d' >  export.txt
+        sed '/Expanded display is on/d; /^\s*$/d' >  export.txt
+        # should also delete single ', " and ` as it may disturb the shell
     
     echo '\d+ flow.fastnetmoninstances' |
         PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} > schema.sql
@@ -671,12 +714,23 @@ function db2cfg()
             ;;
     esac
     
-    sed "
+    awk -F' ' '
+       # remove /32 from hosts (cidr export) 
+       # vpn_ip_addr remote_syslog_server redid_host
+       # exabgp_next_hop graphite_host
+       # not export hostgroup=‘my_hosts:10.10.10.221/32,10.10.10.222/32’
+       $1 == "vpn_ip_addr"              { gsub(/\/32/, "", $2); print; next }
+       $1 == "remote_syslog_server"     { gsub(/\/32/, "", $2); print; next }
+       $1 == "redis_host"               { gsub(/\/32/, "", $2); print; next }
+       $1 == "exabgp_next_hop"          { gsub(/\/32/, "", $2); print; next }
+       $1 == "graphite_host"            { gsub(/\/32/, "", $2); print; next }
+       { print; next }
+       ' < export.txt | sed "
         /Expanded display is on/d
-       s/ /='/
-       s/\$/'/
-       s/^/export /" < export.txt  > export.SH 
-    /bin/rm -f export.txt
+        s/ /='/
+        s/\$/'/
+        s/^/export /" > export.SH 
+        #/bin/rm -f export.txt
 
     logit "db export saved as export.SH"
 
@@ -736,25 +790,26 @@ function db2cfg()
                 echo "error in $file: parameter missing ${OUTPUT}"
             fi
         done
-        echo "files in `pwd`:"
-        ls -1
     )
 
     cd ${OLDDIR}
     ERROR=0
-    for file in ${CFGFILES} rc.conf
+    # move everything from tmpdir to . but don't clubber existing files
+    for file in $( cd ${TMPDIR}; ls )
     do
         if [ -f ${file} ]; then
             ERROR=1
             echo "file $file found"
         fi
     done
-    logit "no existing cfg files found, moving ... "
-    for file in ${CFGFILES} rc.conf
-    do
-        mv ${TMPDIR}/${file} .
-    done
-
+    case $ERROR in 
+        0)  logit "no existing cfg files found, moving ... "
+            mv ${TMPDIR}/* .
+            rmdir ${TMPDIR}
+        ;;
+        1) logit "Stop: files with same name in ${TMPDIR} and ."
+        ;;
+    esac
 }
 
 function cfg2db()
@@ -1015,7 +1070,7 @@ function clean_f () {
 # return value: None
 # see also    :
     $echo trapped
-    /bin/rm -f $TMPFILE
+    /bin/rm -f $TMPFILE $MY_LOGFILE
     exit 1
 }
 
@@ -1036,7 +1091,7 @@ function main()
     default_uuid_administratorid=`sed '/^default_uuid_administratorid/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
     bootstrap_ip=`sed '/^bootstrap_ip/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
 
-    while getopts adcpgi:n:mvh opt
+    while getopts adcpgi:n:mvhu opt
     do
     case $opt in
         a)  DO=addcfgtodb
@@ -1061,6 +1116,8 @@ function main()
             ;;
         p)  DO=pushcfg
             ;;
+        u)  DO=updatecfg
+            ;;
         g)  DO=getcfg
             ;;
         v)  VERBOSE=TRUE
@@ -1084,13 +1141,7 @@ function main()
             ;;
     esac
   
-    exit 0
-    exit 0
-    
-    # db2conf: only required wars are exported from the db
-    # shell export: export.SH 
-    # sql export..: 
-
+    /bin/rm -f $MY_LOGFILE
     exit 0
 
 }

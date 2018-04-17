@@ -271,7 +271,7 @@ monitor_local_ip_addresses = ${monitor_local_ip_addresses}
 
 # Path to pid file for checking "if another copy of tool is running", it's useful when you run multiple instances of tool
 # pid_path = ${pid_path}
-pid_path = pid_path = /var/run/fastnetmon/fastnetmon.pid
+pid_path = /var/run/fastnetmon/fastnetmon.pid
 
 # Path to file where we store information for fastnetmon_client
 cli_stats_file_path = ${cli_stats_file_path}

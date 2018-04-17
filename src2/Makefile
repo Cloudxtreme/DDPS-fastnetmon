@@ -45,6 +45,7 @@ install: version.SH
 	sudo mv /tmp/fnmcfg /opt/db2dps/bin/fnmcfg
 	sudo chown root:root /opt/db2dps/bin/fnmcfg && sudo chmod 555 /opt/db2dps/bin/fnmcfg
 	sudo cp fnmcfg.ini /opt/db2dps/etc/
+	echo done
 
 test:
 	#echo "wrong args" && fnmcfg -v -n fnm.deic.dk
