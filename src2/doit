@@ -1,4 +1,6 @@
 
 rsync -avzH --exclude '*.bak' * ww2:tmp/src/; ssh ww2 'cd tmp/src; sudo make'
 
-ssh ww2 'cd /tmp; sudo rm -fr x; sudo mkdir x; cd x; sudo fnmcfg -v -u -n fastnetmon05.vpn.ddps.deic.dk'
+# ssh ww2 'cd /tmp; sudo rm -fr x; sudo mkdir x; cd x; sudo fnmcfg -v -u -n fastnetmon05.vpn.ddps.deic.dk'
+
+ssh ww2 'cd /tmp/; rm -f /tmp/stop; sudo fnmcfg -v -l'

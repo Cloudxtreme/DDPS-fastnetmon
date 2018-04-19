@@ -43,6 +43,9 @@
 #         -g missing but simple
 #         -a missing
 
+WORKDIR=/tmp/tmpdir
+ENDLOOP=/tmp/stop
+
 
 MYNAME=`basename $0`
 MY_LOGFILE=/tmp/${MYNAME}.log
@@ -598,6 +601,7 @@ EOF
 function updatecfg()
 {
     # assume we are in a empty directory
+    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.updatecfg`
 
     # export and check the data
     db2cfg
@@ -664,6 +668,69 @@ function updatecfg()
         ;;
     esac
     echo "status = $STATUS"
+
+    cd /tmp
+    /bin/rm -fr ${TMPDIR}
+}
+
+function loop()
+{
+
+    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.loop`
+    cd ${TMPDIR}
+
+    # loop db query for changes
+    Q_PENDING="select
+    vpn_ip_addr, hostname
+    from flow.fastnetmoninstances where status = 'pending';"        # unconfigured, pending, updated failed
+
+    while :;
+    do
+        if [ -f ${ENDLOOP} ]; then
+            logit "found stop signal: ${ENDLOOP}, bye"
+            cd /tmp
+            rm -fr ${TMPDIR}
+            break
+        fi
+        ( 
+            # logit "PGPASSWORD=\"${dbpassword}\" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname}"
+
+            logit "quering for pending hosts ... "
+            echo "${Q_PENDING}" | PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} |
+            sed '/Expanded display is on/d; s/\/32//g ' | while read vpn_ip_addr HOSTNAME
+            do
+                # only here if select ... found something
+                logit "found [${HOSTNAME}] [${vpn_ip_addr}]"
+                SQL="SELECT
+                         *\x
+                     FROM flow.fastnetmoninstances where vpn_ip_addr = '$vpn_ip_addr';"
+                         SEARCH="$vpn_ip_addr"
+                         QUERY="$vpn_ip_addr"
+
+                updatecfg
+
+                case $STATUS in
+                    "SUCCESS") logit "updating status in db for $HOSTNAME with uptodate"
+                                UPDATE="UPDATE flow.fastnetmoninstances set status = 'uptodate' WHERE hostname = '$HOSTNAME';"
+                    ;;
+                    *)  : # hmm
+                                logit "updating status in db for $HOSTNAME with failed"
+                                UPDATE="UPDATE flow.fastnetmoninstances set status = 'failed' WHERE hostname = '$HOSTNAME';"
+                    ;;
+                esac
+                echo "${UPDATE}" | PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} | logit
+            done
+            # remove all files in '.' (TMPDIR)
+            /bin/rm -f *
+            logit "query done, sleeping"
+        )
+        sleep 1
+    done
+    cd /tmp
+    rm -fr ${TMPDIR}
+    logit "goodbye"
+    /bin/rm -f ${ENDLOOP}
+    exit 0
 }
 
 function getcfg()
@@ -682,10 +749,7 @@ function db2cfg()
     test -n "${dbpassword}" || usage missing dbpassword
     test -n "${SQL}"        || usage missing sql statement
 
-    TMPDIR=`mktemp -d `     || {
-        echo mktemp failed
-        exit 1
-    }
+    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.db2cfg`
     logit "tmpdir: ${TMPDIR}"
     OLDDIR=`pwd`
     cd ${TMPDIR}
@@ -799,27 +863,29 @@ function db2cfg()
     do
         if [ -f ${file} ]; then
             ERROR=1
-            echo "file $file found"
+            echo "file `pwd`/$file found"
         fi
     done
     case $ERROR in 
         0)  logit "no existing cfg files found, moving ... "
             mv ${TMPDIR}/* .
-            rmdir ${TMPDIR}
+            /bin/rm -fr ${TMPDIR}
         ;;
         1) logit "Stop: files with same name in ${TMPDIR} and ."
+            touch ${ENDLOOP}
+           exit 1
         ;;
     esac
 }
 
 function cfg2db()
 {
-IMPORT="import.sql"
-IMPORTSH="import.sql.SH"
+    IMPORT="import.sql"
+    IMPORTSH="import.sql.SH"
 
-TMPEXPORT="tmp_export.SH"
+    TMPEXPORT="tmp_export.SH"
 
-SCHEMA="schema.sql"
+    SCHEMA="schema.sql"
 
     TMPFILE=/tmp/$$.tmp
 
@@ -1091,7 +1157,9 @@ function main()
     default_uuid_administratorid=`sed '/^default_uuid_administratorid/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
     bootstrap_ip=`sed '/^bootstrap_ip/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
 
-    while getopts adcpgi:n:mvhu opt
+    mkdir ${WORKDIR}
+
+    while getopts adcpgli:n:mvhu opt
     do
     case $opt in
         a)  DO=addcfgtodb
@@ -1119,6 +1187,8 @@ function main()
         u)  DO=updatecfg
             ;;
         g)  DO=getcfg
+            ;;
+        l)  DO=loop
             ;;
         v)  VERBOSE=TRUE
             ;;
