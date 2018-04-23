@@ -1,6 +1,9 @@
 
 # Export / Import fastnetmon host configurations
 
+This is a set of ad-hoc tools. Part of the functionality will be obsoleted once the
+Web-UI supersedes it.
+
 ## Installation
 
 This directory contains helper scripts. The scripts must be installed on `ww1`
@@ -132,7 +135,7 @@ It should also
   - ssh upload
   - be able to make coffee and do sub sea spot weld as well
 
-And do a rollback if one or more tests fails.
+And do a rollback if one or more tests fails. But as for now, it doesn't.
 
 ### Background updates
 
