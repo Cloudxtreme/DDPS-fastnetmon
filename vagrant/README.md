@@ -144,134 +144,12 @@ configuration files before it can go in production.
 The customer owning the FastNetMon must exist in DDPS, and the network
 protected by the FastNetMon must exist as part of the customers network.
 
-
-UD Start by making a directory for files which must be applied to the new host by
-UD renaming or copying the content of `example_config` to e.g. test01.ddps.deic.dk:
-UD 
-UD     mv example_config test01.ddps.deic.dk
-UD 
-UD Next
-UD 
-UD   - Crate customer if not already done on DDPS
-UD   - create FastNetMon instance for the customer
-UD   - Add FastNetMon config to the database for the customer
-UD 
-UD ### Generating OpenVPN configuration file and SSH keys
-UD The configuration is made on `fw.ddps`. Execute
-UD 
-UD     /root/bin/openvpn_add_clien ${client-fqdn-or-ipv4address}
-UD 
-UD Add / check the IP address assigned in `/usr/local/etc/openvpn/ipp.txt`, the address
-UD is referred as `ipv4-vpn-address` in this text.
-UD 
-UD The ssh configuration must be made with
-UD 
-UD     ssh-keygen -C "hostname@ipv4-vpn-address" -N '' -t ED25519 -f ed25519
-UD 
-UD Setting `hostname` and `ipv4-vpn-address`  as part of the key comment will make
-UD it relative easy to keep a tight __authorized_keys__ on DDPS.
-UD 
-### Export the FastNetMon and other options from the database 
-
-Extract the information from the database  on `ww1.ddps` or `ww2.ddps` with
-
-    fnmcfg -v -d -n fnm.deic.dk
-
-Or
-
-    fnmcfg -v -d -i vpn-ipv4-address
-
-
-Move `exported.SH` to `test01.ddps.deic.dk`.
-
-Add the new key on both `ww1.ddps` and `ww2.ddps`with
-
-``````
-sudo chattr -i /home/sftpgroup/newrules/.ssh/authorized_keys
-sudo vi        /home/sftpgroup/newrules/.ssh/authorized_keys
-sudo chattr +i /home/sftpgroup/newrules/.ssh/authorized_keys
-``````
-
-Then copy the latest `i2dps` package from ../src to e.g.
-`test01.ddps.deic.dk/i2dps ... txz`
-
-Create template files for the configuration files where the value is
-replaced with a shell variable named the same as the var (`var = $var`), together
-with all vars exported as shell vars to `files2db.SH` with the
-command
-
-``````
-cd test01.ddps.deic.dk && ./cfg2SH_and_tmpl.pl
-``````
-
-You should now have the files
-
-  - **export.SH**: exported settings from the database
-  - **files2db.SH**: exported settings from the configuration files
-  - **fastnetmon.conf.tmpl**: configuration file with shell vars
-  - **fnm2db.ini.tmpl**: INI style configuration file with shell vars
-  - **networks_list.tmpl**: configuration file with shell vars
-  - **networks_whitelist.tmpl**: configuration file with shell vars
-
-Build the config files with
-
-
----- HMM ----
-Build the new configuration files with
-
-``````
-rsync -avzL test01.ddps.deic.dk 192.168.68.2:/tmp
-ssh 192.168.68.2 'bash /tmp/test01.ddps.deic.dk/postbootstrap.sh build'
-``````
-This will build configuration files and place them in `/tmp`, and
-print diff output for comparison.
-
-If you are happy with the selected interfaces and configuration you may apply
-the initial host specific configuration with the command
-
-``````
-ssh 192.168.68.2 'bash /tmp/test01.ddps.deic.dk/postbootstrap.sh apply'
-``````
-
-If you prefer to do final part of the installation by hand read on.
-
-Modify `/etc/rc.conf` so the uplink and FastNetMon interfaces are configured
-correctly and influx and fastnetmon started on boot. See example in
-`example_config`.
-
-The FastNetMon notification script is wrapped in a package (currently
-`i2dps_1.0-19.txz`) and must be installed with:
-
-    sudo pkg install -y i2dps_1.0-19.txz
-
-The configuration file for the FastNetMon notification script is in
-`/opt/i2dps/etc/fnm2db.ini` and the SSH keys must be installed in
-`/opt/i2dps/etc/ssh/`, owner root:root, mode 700
-
-Edit the config file for the FastNetMon notification script (`fnm2db.ini`), and
-change `customerid`, `fastnetmoninstanceid`, `uuid` and `administratorid`, as
-well as the `mode`, the information should be extracted from the DDPS database.
-
-Test the configuration with the command from the host:
-
-``````
-ssh .. ... ...
-``````
-
-Next add monitored networks to `networks_list` and white listed networks to
-`networks_whitelist`.        
-At least change at least the `interfaces =  ... ` in `fastnetmon.conf`. There
-should be no changes to `influxd.conf`
-
-
-The file `/etc/rc.conf` must be edited as well, see `rc.conf.tmpl`. as well
-as `fastnetmon.conf`, `fnm2db.ini`, `influxd.conf`, `networks_list` and
-`networks_whitelist`.
+Continue with the customer specific configuration, as described [here](src2/README.md)
 
 ### Final note
 
 As the host keys for 192.168.68.2 will change each time a new host is installed,
-the following configuration can be applied to `~/.ssh/config` to ignore the
+the following configuration can be applied to your `~/.ssh/config` to ignore the
 warning from ssh (among other things):
 
 ```````
@@ -284,7 +162,4 @@ Host 192.168.68.2
     AddKeysToAgent no
     ProxyCommand ssh -W %h:%p fw.ddps.deic.dk
 ```````
-
-
-
 
