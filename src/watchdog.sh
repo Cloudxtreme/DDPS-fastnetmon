@@ -31,5 +31,15 @@ do
 	esac
 done
 
+ping -t 2 -Q -c 1 192.168.67.1
+case $? in
+    0)  $logger "ping 192.168.67.1 ok, openvpn up"
+        ;;
+    *)  $logger "ping 92.168.67.1 failed, restarting openvpn service"
+        $service status openvpn | $logger -p daemon.warn
+        service openvpn restart 2>&1 | $logger -p daemon.warn
+        ;;
+esac
+
 exit 0
 

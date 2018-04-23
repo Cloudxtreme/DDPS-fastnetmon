@@ -37,6 +37,8 @@ UID			= root
 
 EXCLUDE_INSTALL	= exclude_from_install.txt
 
+SERVICEFILE		= db2fnm.service
+
 pkgs		= mkisofs curl libdata-dumper-simple-perl
 
 install: version.SH
@@ -45,17 +47,13 @@ install: version.SH
 	sudo mv /tmp/fnmcfg /opt/db2dps/bin/fnmcfg
 	sudo chown root:root /opt/db2dps/bin/fnmcfg && sudo chmod 555 /opt/db2dps/bin/fnmcfg
 	sudo cp fnmcfg.ini /opt/db2dps/etc/
+	sudo cp db2fnm /opt/db2dps/etc/init.d
+	sudo chmod 555 /opt/db2dps/etc/init.d/db2fnm
+	sudo cp $(SERVICEFILE) /etc/systemd/system/
+	sudo systemctl enable $(SERVICEFILE)
+	sudo systemctl stop $(SERVICEFILE) || 1
+	sudo systemctl start $(SERVICEFILE)
 	echo done
-
-test:
-	#echo "wrong args" && fnmcfg -v -n fnm.deic.dk
-	echo "export db " && fnmcfg -v -d -n fnm.deic.dk
-	#echo "add new .." && fnmcfg -v -a -n fnm.deic.dk
-	#echo "update ..." && fnmcfg -v -u -n fnm.deic.dk
-	#echo "push ....." && fnmcfg -v -p -n fnm.deic.dk
-	#echo "get ......" && fnmcfg -v -g -n fnm.deic.dk
-
-
 
 version.SH: fnmcfg.sh
 	./mk-version.sh

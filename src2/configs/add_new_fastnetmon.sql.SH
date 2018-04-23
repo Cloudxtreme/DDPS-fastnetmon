@@ -12,6 +12,13 @@ INSERT INTO flow.fastnetmoninstances
 
 UPDATE flow.fastnetmoninstances
     SET 
+    notes = 'New FastNetMon instance'
+    -- unconfigured, pending, updated or failed
+    -- unconfigured: a new system
+    -- pending:      waiting to export changes to config from database
+    -- updated:      system config is synced with database
+    -- failed:       update failed, manual investigation required
+    status = 'unconfigured'
     networks_list = '${NETWORKS_LIST}',
     interfaces = '${FASTEST_INTERFACE}',
     -- discard, accept or rate-limit 9600
@@ -131,5 +138,5 @@ UPDATE flow.fastnetmoninstances
     pid_path = '/var/run/fastnetmon.pid',
     cli_stats_file_path = '/tmp/fastnetmon.dat',
     enable_api = 'off',
-    sort_parameter = 'packets'
+    sort_parameter = 'packets',
 WHERE hostname = '${HOSTNAME}';

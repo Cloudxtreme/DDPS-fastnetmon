@@ -14,38 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# TODO
-#  !!!! must assign an uuid_administratorid to fastnetmon instances in db also !!!!
-#  !!!! cannot be done automatically, but we may just define that all fastnetmon !!
-#  !!!! uses the same uuid_administratorid ???
-#  !!!! -- print list of customers / uuid_customerid during add / update ?
-#  !!! -- print list of customers administratorid(s) / uuid_administratorid(s) ?
 #
 #   ~/etc/$0.ini:
 #   [default]
 #   default_uuid_administratorid    = $uuid_administratorid
 #   bootstrap_ip                    = 192.168.68.2
 #
-#   -a: add new FastNetMon host with default values to database. Specify
-#       hostname of vpn ipaddress
-#   -i: import existing information from files in .
-#   -c: import values from config files 
-#   -p: check and push config files to host from . and restart services, rollback if not ok
-#   -g: get config from hosts to .
-#
-#
 #   -x: print all customers(s) / uuid_customerid(s) / uuid_administratorid(s)
 #
-#
-# STATUS: -d sortof ok
-#         -c ditto
-#         -p missing but simple
-#         -g missing but simple
-#         -a missing
+# This is work in progress, and should have been written in an other language. 
 
 WORKDIR=/tmp/tmpdir
 ENDLOOP=/tmp/stop
-
+TIMEOUT=20
 
 MYNAME=`basename $0`
 MY_LOGFILE=/tmp/${MYNAME}.log
@@ -68,20 +49,14 @@ function logit() {
     STRING="$*"
 
     if [ -n "${STRING}" ]; then
-        $echo "${LOGIT_NOW} ${STRING}" >> ${MY_LOGFILE}
         if [ "${VERBOSE}" = "TRUE" ]; then
-            $echo "${LOGIT_NOW} ${STRING}"
+            logger -p local3.info -t ${MYNAME} "${STRING}"
         fi
     else
         while read LINE
         do
             if [ -n "${LINE}" ]; then
-                $echo "${LOGIT_NOW} ${LINE}" >> ${MY_LOGFILE}
-                if [ "${VERBOSE}" = "TRUE" ]; then
-                    $echo "${LOGIT_NOW} ${LINE}"
-                fi
-            else
-                $echo "" >> ${MY_LOGFILE}
+                logger -p local3.info -t ${MYNAME} "${LINE}"
             fi
         done
     fi
@@ -157,9 +132,11 @@ cat << EOF
     -a: add new FastNetMon host to database. Specify hostname of vpn ipaddress
         save import.sql with default values for import with psql
     -d: export database to config files
+    -e: exit a subset of fastnetmon configurations
     -c: import values from config files by saving values to import.sql
     -p: push config files to host and restart services
     -g: fetch config from hosts to .
+    -s: print status for all fastnetmon instances
 
 EOF
     exit 2
@@ -250,87 +227,6 @@ EOF
 #INCLUDE_VERSION_SH
 
 # functions
-
-function logit() {
-# purpose     : Timestamp output
-# arguments   : Line og stream
-# return value: None
-# see also    :
-    LOGIT_NOW="`date '+%H:%M:%S (%d/%m)'`"
-    STRING="$*"
-
-    if [ -n "${STRING}" ]; then
-        $echo "${LOGIT_NOW} ${STRING}" >> ${MY_LOGFILE}
-        if [ "${VERBOSE}" = "TRUE" ]; then
-            $echo "${LOGIT_NOW} ${STRING}"
-        fi
-    else
-        while read LINE
-        do
-            if [ -n "${LINE}" ]; then
-                $echo "${LOGIT_NOW} ${LINE}" >> ${MY_LOGFILE}
-                if [ "${VERBOSE}" = "TRUE" ]; then
-                    $echo "${LOGIT_NOW} ${LINE}"
-                fi
-            else
-                $echo "" >> ${MY_LOGFILE}
-            fi
-        done
-    fi
-}
-
-function savefile()
-{
-    if [ ! -f "$1" ]; then
-        echo "program error in function savefile, file '$1' not found"
-        exit 0
-    fi
-    if [ ! -f "$1".org ]; then
-        echo "$0: saving original $1 as $1.org ... "
-        cp "$1" "$1".org
-    fi
-}
-
-# purpose     : Change case on word
-# arguments   : Word
-# return value: GENDER=word; GENDER=`toLower $GENDER`; echo $GENDER
-# see also    :
-function toLower() {
-    echo $1 | tr "[:upper:]" "[:lower:]"
-}
-
-function toUpper() {
-    echo $1 | tr  "[:lower:]" "[:upper:]"
-}
-
-
-logit() {
-# purpose     : Timestamp output
-# arguments   : Line og stream
-# return value: None
-# see also    :
-    LOGIT_NOW="`date '+%H:%M:%S (%d/%m)'`"
-    STRING="$*"
-
-    if [ -n "${STRING}" ]; then
-        $echo "${LOGIT_NOW} ${STRING}" >> ${MY_LOGFILE}
-        if [ "${VERBOSE}" = "TRUE" ]; then
-            $echo "${LOGIT_NOW} ${STRING}"
-        fi
-    else
-        while read LINE
-        do
-            if [ -n "${LINE}" ]; then
-                $echo "${LOGIT_NOW} ${LINE}" >> ${MY_LOGFILE}
-                if [ "${VERBOSE}" = "TRUE" ]; then
-                    $echo "${LOGIT_NOW} ${LINE}"
-                fi
-            else
-                $echo "" >> ${MY_LOGFILE}
-            fi
-        done
-    fi
-}
 
 usage() {
 # purpose     : Script usage
@@ -631,53 +527,79 @@ function updatecfg()
     test -n $HOSTNAME && connect_to=$HOSTNAME
 
     ERRORS=0
-    logit "applying fastnetmon configuration changes on $connect_to ... "
-    RTMPDIR=`mktemp -u`
-    ssh ${connect_to} "mkdir -p ${RTMPDIR}"
-    scp ${FILES} ${connect_to}:${RTMPDIR}
 
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon stop";   ERRORS=$((ERRORS + $?))
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd stop";      ERRORS=$((ERRORS + $?))
+    # see man: '-k ${TIMEOUT}' '${TIMEOUT}' are two different parameters ...
+    timeout  -k ${TIMEOUT} ${TIMEOUT}  ssh ${connect_to} "uptime"
+    case $? in
+        0)  logit "ssh on host ${connect_to} is alive"
 
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon status"
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd status"
+            logit "applying fastnetmon configuration changes on $connect_to ... "
+            RTMPDIR=`mktemp -u`
+            ssh ${connect_to} "mkdir -p ${RTMPDIR}"
+            scp ${FILES} ${connect_to}:${RTMPDIR}
 
-    #ssh  -qt ${connect_to} " sync; sync; sync"
+            ssh  -qt ${connect_to} "cd ${RTMPDIR}; mv fastnetmon.conf networks_list networks_whitelist /usr/local/etc/; cd /tmp; rm -fr ${RTMPDIR}"
 
-    #ssh  -qt ${connect_to} "cd ${RTMPDIR}; mv influxd.conf fastnetmon.conf networks_list networks_whitelist /usr/local/etc/"
-    ssh  -qt ${connect_to} "cd ${RTMPDIR}; mv fastnetmon.conf networks_list networks_whitelist /usr/local/etc/"
+            logit "starting fastnetmon ... "
+            ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon restart";  ERRORS=$((ERRORS + $?))
+            ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon status"; ERRORS=$((ERRORS + $?))
 
-    #ssh  -qt ${connect_to} "chown influxd:influxd /usr/local/etc/influxd.conf"
-    #ssh  -qt ${connect_to} " sync; sync; sync"
-
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd start";     ERRORS=$((ERRORS + $?))
-    #ssh  -qt ${connect_to} " sync; sync; sync"
-
-    logit "starting fastnetmon ... "
-    ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon restart";  ERRORS=$((ERRORS + $?))
-
-    ssh  -qt ${connect_to} "/usr/local/etc/rc.d/fastnetmon status"; ERRORS=$((ERRORS + $?))
-    #ssh  -qt ${connect_to} "/usr/local/etc/rc.d/influxd status";    ERRORS=$((ERRORS + $?))
-
-    case $ERRORS in
-        0)  STATUS="SUCCESS"
-            logit "fastnetmon successfully restarted with new configuration"
-            ;;
-        *)  STATUS="FAIL"
-            logit "fastnetmon failed restart with new configuration"
+            case $ERRORS in
+                0)  STATUS="SUCCESS"
+                    logit "fastnetmon successfully restarted with new configuration"
+                    ;;
+                *)  STATUS="FAIL"
+                    logit "fastnetmon failed restart with new configuration"
+                ;;
+            esac
+        ;;
+        *)  logit "ssh on host ${connect_to} is NOT alive, try later"
+            STATUS="FAIL"
         ;;
     esac
     echo "status = $STATUS"
-
     cd /tmp
     /bin/rm -fr ${TMPDIR}
 }
 
+function edit()
+{
+    local TMPDIR=`mktemp -p /tmp/tmpdir -d edit.XXXXXXXXXX`
+    local OLDDIR=`pwd`
+    cd ${TMPDIR}
+
+    db2cfg
+
+    RMFILES=`ls -1 |grep -v export.SH`
+    (
+        NOW=`date +%s `
+        . export.SH
+        # export 
+        export status="pending"
+        export SEARCH="$SEARCH"
+        export QUERY="$QUERY"
+        envsubst < /opt/db2dps/etc/configs/change_fastnetmon_parameters.sql.SH   > ${TMPDIR}/change_fastnetmon_parameters.sql
+    )
+
+    cd ${OLDDIR}
+    if [ -f "${OLDDIR}/change_fastnetmon_parameters.sql" ]; then
+        echo "existing change_fastnetmon_parameters.sql, please rename and try again"
+    else
+        mv ${TMPDIR}/change_fastnetmon_parameters.sql .
+        echo "made change_fastnetmon_parameters.sql; edit and run"
+    fi
+
+    rm -fr ${TMPDIR}
+    exit 0
+}
+
 function loop()
 {
-
     local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.loop`
     cd ${TMPDIR}
+
+    # loop master/client?
+    Q_IS_MASTER="select pg_is_in_recovery();"
 
     # loop db query for changes
     Q_PENDING="select
@@ -692,8 +614,28 @@ function loop()
             rm -fr ${TMPDIR}
             break
         fi
+        # loop master/client?
+        while :;
+        do
+            logit "quering for is master or client ... "
+            IS_MASTER=`echo "${Q_IS_MASTER}" | PGPASSWORD="${dbpassword}" psql -t -F' ' -h 127.0.0.1 -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname}`
+
+            case ${IS_MASTER} in
+                "f")    logit "localhost is master"
+                        break
+                ;;
+                "t")    logit "localhost is not master, sleeping"
+                        sleep 60
+                ;;
+                "*")    logit "localhost is nither master nor client, sleeping"
+                        sleep 60
+                ;;
+            esac
+        done
+
         ( 
             # logit "PGPASSWORD=\"${dbpassword}\" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname}"
+            echo "${Q_PENDING}" | PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} |
 
             logit "quering for pending hosts ... "
             echo "${Q_PENDING}" | PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} |
@@ -742,6 +684,26 @@ function getcfg()
     # scp $vpn_ip_addr 
 }
 
+function status()
+{
+    echo "Status according to database"
+    echo "select hostname, status, notes from flow.fastnetmoninstances;" | sudo su postgres -c "cd /tmp; psql -d netflow"
+
+    echo "Status from ssh to host"
+    echo "select hostname, status from flow.fastnetmoninstances;" | sudo su postgres -c "cd /tmp; psql -t -d netflow" |
+    sed 's/|//; /^\s*$/d' | while read hostname status rest of line
+    do
+        $echo $N "$hostname $C"
+        case $status in
+            down|'') echo "not tested: system down"
+                ;;
+             *)  S="`timeout  -k ${TIMEOUT} ${TIMEOUT} sudo ssh ${hostname} \"service fastnetmon status; service influxd status\"`"
+                 S="`echo $S`"
+                 echo "$S"
+                ;;
+        esac
+    done
+}
 
 function db2cfg()
 {
@@ -751,7 +713,7 @@ function db2cfg()
 
     local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.db2cfg`
     logit "tmpdir: ${TMPDIR}"
-    OLDDIR=`pwd`
+    local OLDDIR=`pwd`
     cd ${TMPDIR}
 
     # Following gives var='value' -- notice lack of ending ;
@@ -1157,9 +1119,9 @@ function main()
     default_uuid_administratorid=`sed '/^default_uuid_administratorid/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
     bootstrap_ip=`sed '/^bootstrap_ip/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
 
-    mkdir ${WORKDIR}
+    test -d  ${WORKDIR} || mkdir ${WORKDIR}
 
-    while getopts adcpgli:n:mvhu opt
+    while getopts adcepgli:n:mvhus opt
     do
     case $opt in
         a)  DO=addcfgtodb
@@ -1182,6 +1144,8 @@ function main()
             ;;
         c)  DO=cfg2db
             ;;
+        e)  DO=edit
+            ;;
         p)  DO=pushcfg
             ;;
         u)  DO=updatecfg
@@ -1194,6 +1158,8 @@ function main()
             ;;
         h)  usage
             exit
+            ;;
+        s)  DO=status
             ;;
     	*)	usage
     		exit

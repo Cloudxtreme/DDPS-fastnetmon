@@ -93,7 +93,7 @@ Add the new host to database with
 
 Create ssh keys with the command
 
-     ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t ED25519 -f ed25519
+     ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t 25519 -f id_ed25519
 
 Add the new key **on both** `ww1.ddps` and `ww2.ddps`with
 
@@ -130,7 +130,110 @@ It should also
   - check services
   - test the OpenVPN connectivity and
   - ssh upload
+  - be able to make coffee and do sub sea spot weld as well
 
-and do a rollback if one or more tests fails.
+And do a rollback if one or more tests fails.
 
+### Background updates
+
+`fnmcfg` also runs in the background watching for configuration changes which
+must be applied. Changing the field _status_ to _pending_ will trigger an update. Valid words are:
+
+| Word           | Description |
+| -------------- | ----------- |
+| unconfigured   | New unconfigured system |
+| pending        | System changes waiting to be enforced |
+| updated        | System is up to date |
+| failed         | Enforcing changed has failed or system is down |
+| shotdown       | System deliberately out of reach |
+
+The table should not be edited directly. The service is started by _systemd_,
+and is _pgpool2_ aware. Status may be shown with:
+
+    service db2fnm status
+
+### Command-line edit FastNetMon host parameters
+
+The database may be edited with
+
+    sudo su postgres -c "cd /tmp; psql -d netflow "
+
+The fastnetmon configuration parameters may be edited (and updated on the host) with
+
+    fnmcfg -v -e -i 192.168.67.2
+
+or
+
+    fnmcfg -v -e -n fastnetmon02.vpn.ddps.deic.dk
+
+The command creates the file `change_fastnetmon_parameters.sql` which must be
+manually edited:
+
+````````sql
+UPDATE flow.fastnetmoninstances
+    SET
+    -- notes:
+    --      description e.g. 'M1 E2, contact NTH or NIE'
+    notes = '',
+    networks_list = '',
+    -- mode:
+    --      accept, discard, accept or rate-limit 9600
+    --      accept: monitor only -- creating dummy rules
+    mode = 'discard',
+    networks_whitelist = '130.225.242.200/29 130.225.245.208/29',
+    blocktime = '10',
+    process_incoming_traffic = 'on',
+    process_outgoing_traffic = 'off',
+    ban_time = '10',
+    threshold_pps = '20000',
+    threshold_mbps = '1000',
+    threshold_flows = '3500',
+    threshold_tcp_mbps = '10000',
+    threshold_udp_mbps = '10000',
+    threshold_icmp_mbps = '10000',
+    threshold_tcp_pps = '10000',
+    threshold_udp_pps = '10000',
+    threshold_icmp_pps = '10000',
+    ban_for_tcp_bandwidth = 'on',
+    ban_for_udp_bandwidth = 'on',
+    ban_for_icmp_bandwidth = 'on',
+    ban_for_tcp_pps = 'on',
+    ban_for_udp_pps = 'on',
+    ban_for_icmp_pps = 'on',
+    status = 'pending'
+WHERE hostname = 'fastnetmon02.vpn.ddps.deic.dk';
+````````
+
+Next run the command
+
+    cat change_fastnetmon_parameters.sql | sudo su postgres -c "cd /tmp; psql -d netflow "
+
+which will save the parameters in the database. The changes will be enforced by the daemonized `fnmcfg`.
+
+### Command-line edit FastNetMon host status check
+
+Finally you may check the status for all fastnetmon instances with the command
+
+    fnmcfg -v -s
+
+Example output:
+
+````````bash
+Status according to database
+           hostname            |  status  |                               notes
+-------------------------------+----------+--------------------------------------------------------------------
+ fnm.deic.dk                   | down     | system does no longer exist
+                               |          |
+ fastnetmon02.vpn.ddps.deic.dk |          |
+ fastnetmon04.vpn.ddps.deic.dk |          |
+ fastnetmon03.vpn.ddps.deic.dk | uptodate | Ny fnm i M1, E2 - vi skal have fundet en anvendelse og net til den
+ fastnetmon05.vpn.ddps.deic.dk | uptodate |
+(6 rows)
+
+Status from ssh to host
+fnm.deic.dk not tested: system down
+fastnetmon02.vpn.ddps.deic.dk not tested: system down
+fastnetmon04.vpn.ddps.deic.dk not tested: system down
+fastnetmon03.vpn.ddps.deic.dk fastnetmon is running as pid 2622. influxd is running as pid 2612.
+````````
 
