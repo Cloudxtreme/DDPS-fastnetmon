@@ -53,13 +53,14 @@ install: version.SH
 	sudo systemctl enable $(SERVICEFILE)
 	sudo systemctl stop $(SERVICEFILE) || 1
 	sudo systemctl start $(SERVICEFILE)
+	sudo systemctl status $(SERVICEFILE)
 	echo done
 
 version.SH: fnmcfg.sh
-	./mk-version.sh
+	bash ./mk-version.sh
 
 version.pm:
-	./mk-version.sh
+	bash ./mk-version.sh
 
 uninstall:
 			echo remove everything below $(PREFIX)

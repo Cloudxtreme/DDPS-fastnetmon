@@ -27,6 +27,9 @@
 WORKDIR=/tmp/tmpdir
 ENDLOOP=/tmp/stop
 TIMEOUT=20
+CSVFILE=${WORKDIR}/csvfile.$$
+REPORT_FILE=${WORKDIR}/report.html
+ANNOUNCEMENTS_STATUS_FILE=${WORKDIR}/announcements_status.txt
 
 MYNAME=`basename $0`
 MY_LOGFILE=/tmp/${MYNAME}.log
@@ -37,7 +40,6 @@ UPLINK=""
 UUID=""
 
 #INCLUDE_VERSION_SH
-
 # functions
 
 function logit() {
@@ -49,14 +51,18 @@ function logit() {
     STRING="$*"
 
     if [ -n "${STRING}" ]; then
+        logger -p local3.info -t ${MYNAME} "${STRING}"
         if [ "${VERBOSE}" = "TRUE" ]; then
-            logger -p local3.info -t ${MYNAME} "${STRING}"
+            echo "${LOGIT_NOW} ${STRING}"
         fi
     else
         while read LINE
         do
             if [ -n "${LINE}" ]; then
                 logger -p local3.info -t ${MYNAME} "${LINE}"
+                if [ "${VERBOSE}" = "TRUE" ]; then
+                    echo "${LOGIT_NOW} ${STRING}"
+                fi
             fi
         done
     fi
@@ -127,7 +133,7 @@ cat << EOF
     -i: argument is the vpn-ip-address
     -n: argument is the hostname
 
-    arguments -a, -c -d, -p and -c are mutually exclusive
+    arguments -a, -c -d, -e, -p are mutually exclusive
 
     -a: add new FastNetMon host to database. Specify hostname of vpn ipaddress
         save import.sql with default values for import with psql
@@ -141,92 +147,6 @@ cat << EOF
 EOF
     exit 2
 }
-
-function find_port_and_listen_address()
-{
-    # we run pgpool2 in production but not in the test environment, it may be installed though
-    if [ -f /opt/pgpool2/etc/pgpool.conf ]; then
-        # check if using pgpool2 bound to IP and PORT
-        service pgpool status>/dev/null
-        case $? in
-            0)  PORT=`sed "/^port/!d; s/.*=//; s/[ \t]*//; s/'//g" /opt/pgpool2/etc/pgpool.conf`
-                LISTEN=`sed "/^listen_addresses/!d; s/.*=//; s/[ \t]*//; s/'//g" /opt/pgpool2/etc/pgpool.conf`
-                logit "running pgpool2 detected"
-                ;;
-            *)  PORT=5432
-                LISTEN=localhost
-                logit "no running pgpool2 detected but /opt/pgpool2/etc/pgpool.conf found"
-                ;;
-        esac
-     else
-        PORT=5432
-        LISTEN=localhost
-    fi
-
-    # this doesn't cover pgpool2 but is good enough
-    if [ -f /opt/db2dps/etc/db.ini ];
-    then
-        eval `egrep 'dbuser|dbpassword|dbname' /opt/db2dps/etc/db.ini | sed 's/[ \t]*//g'`
-    else
-        echo file /opt/db2dps/etc/db.ini not found
-        exit 0
-    fi
-
-    export $dbuser
-    export $dbpassword
-    export $dbname
-
-    dbpassword="$dbpassword"
-    export PGPASSWORD="${dbpassword}"
-    PGSQL="psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname}"
-
-}
-
-function get_interface_information_from_bootstrap()
-{
-    logit "getting interface information from bootstraped host ... "
-    logit "ssh to $bootstrap_ip / 192.168.68.2"
-
-    # ix0 10Gb
-    # igb0 1Gb
-    # em0  1Gb
-
-    logit "stopping openvpn and detecting uplink ... "
-    cat << 'EOF' > /tmp/find_uplink.sh
-    #!/bin/sh
-    service openvpn stop
-    netstat -rn -f inet|awk '$1 == "default" { print $NF }'>/var/tmp/uplink
-    service openvpn start
-    real_interfaces=`ifconfig -a| egrep '^[a-z0-9]*:'|sed 's/:.*//; /lo0/d; /tun/d'|sort -n`
-    fastest_if=""
-    for interface in ${real_interfaces} igb0 igb1 ix0 ix1 ix2 ix3; do
-    # append 10Gb last for testing
-        ifconfig $interface >/dev/null 2>&1
-        case $? in
-            0)  used=`ifconfig $interface|sed '/inet/!d; /0.0.0.0/d;'|wc -l | tr -d ' ' `
-            if [ $used -eq 0 ]; then
-                fastest_if=$interface
-            fi
-            ;;
-            *)  : # no such interface
-            ;;
-        esac
-    done
-    echo $fastest_if > /var/tmp/fastest_interface
-
-EOF
-    scp /tmp/find_uplink.sh root@$bootstrap_ip:/tmp
-    cat << EOF | ssh root@$bootstrap_ip
-    chmod 555 /tmp/find_uplink.sh && /tmp/find_uplink.sh
-EOF
-
-    FASTEST_INTERFACE="`ssh -q root@$bootstrap_ip 'cat /var/tmp/fastest_interface'`"
-    UPLINK="`ssh -q root@$bootstrap_ip 'cat /var/tmp/uplink'`"
-}
-
-#INCLUDE_VERSION_SH
-
-# functions
 
 usage() {
 # purpose     : Script usage
@@ -497,7 +417,8 @@ EOF
 function updatecfg()
 {
     # assume we are in a empty directory
-    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.updatecfg`
+    test -d ${WORKDIR} || mkdir ${WORKDIR}
+    local TMPDIR=`mktemp -p ${WORKDIR} -d XXX.updatecfg`
 
     # export and check the data
     db2cfg
@@ -564,7 +485,8 @@ function updatecfg()
 
 function edit()
 {
-    local TMPDIR=`mktemp -p /tmp/tmpdir -d edit.XXXXXXXXXX`
+    test -d ${WORKDIR} || mkdir ${WORKDIR}
+    local TMPDIR=`mktemp -p ${WORKDIR} -d edit.XXXXXXXXXX`
     local OLDDIR=`pwd`
     cd ${TMPDIR}
 
@@ -595,7 +517,8 @@ function edit()
 
 function loop()
 {
-    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.loop`
+    test -d ${WORKDIR} || mkdir ${WORKDIR}
+    local TMPDIR=`mktemp -p ${TMPDIR} -d XXX.loop`
     cd ${TMPDIR}
 
     # loop master/client?
@@ -663,7 +586,7 @@ function loop()
                 echo "${UPDATE}" | PGPASSWORD="${dbpassword}" psql -p ${PORT} -t -F' ' -h $LISTEN -A -U ${dbuser} -v ON_ERROR_STOP=1 -w -d ${dbname} | logit
             done
             # remove all files in '.' (TMPDIR)
-            /bin/rm -f *
+            # /bin/rm -f *
             logit "query done, sleeping"
         )
         sleep 1
@@ -684,25 +607,206 @@ function getcfg()
     # scp $vpn_ip_addr 
 }
 
+# Use status for TODAY (yesterday) and TODAY (today till now) for restartcount* not status service ...
 function status()
 {
-    echo "Status according to database"
-    echo "select hostname, status, notes from flow.fastnetmoninstances;" | sudo su postgres -c "cd /tmp; psql -d netflow"
+    echo "Expected status:"
+    echo "select hostname, status, notes from flow.fastnetmoninstances ;" | sudo su postgres -c "cd /tmp; psql -d netflow" |
+    sed '/^(.*rows)$/d'
 
-    echo "Status from ssh to host"
-    echo "select hostname, status from flow.fastnetmoninstances;" | sudo su postgres -c "cd /tmp; psql -t -d netflow" |
-    sed 's/|//; /^\s*$/d' | while read hostname status rest of line
+    echo "Real status:"
+    echo "select hostname, status from flow.fastnetmoninstances where status not like 'offline';" | sudo su postgres -c "cd /tmp; psql -t -d netflow" 2>/dev/null |
+    sed 's/|//; /^\s*$/d; ' | while read hostname status rest of line
     do
         $echo $N "$hostname $C"
-        case $status in
-            down|'') echo "not tested: system down"
+        S="`timeout  -k ${TIMEOUT} ${TIMEOUT} sudo ssh -o ConnectTimeout=5 -n ${hostname} \"service fastnetmon status; service influxd status\"`"
+        S="`echo $S`"
+        echo "$S"
+    done
+
+    check_announcements_matches_db
+    echo ""
+    echo "Announcements (rules) staus: "
+    echo "${STATUS}"
+    # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
+    local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
+    ERRORS=$((ERRORS + AERRORS))
+    
+    case $ERRORS in
+      0)    echo "no errors everything running as expected, bye"
+      ;;
+      *)    echo "found $ERRORS errors please investigate"
+      ;;
+    esac
+
+}
+
+function check_announcements_matches_db()
+{
+    # rules etc. must match - require bird on yet an other host
+
+    for TEST in 1 2 3 4 5
+    do
+        local e21_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.e21_flow4| .active] | .[]' | sed 's/"//g'`
+        local e22_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.e22_flow4| .active] | .[]' | sed 's/"//g'`
+        local mx42_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.mx42_flow4| .active] | .[]' | sed 's/"//g'`
+
+        local RULES=`sudo su postgres -c "cd /tmp; echo 'SELECT distinct COUNT(*) from flow.flowspecrules where not isexpired \x\a\f =' |psql -d netflow -q" | sed 's/count=//'`
+
+        if [ "$e21_flow4" = "$e22_flow4" ] && [ "$e22_flow4" = "$mx42_flow4" ] && [ "$e22_flow4" = "$RULES" ]; then
+            STATUS="ok: $RULES announcements in database, exabgp1,2 and mx80"
+            break
+        else
+            STATUS="error: e21_flow4=$e21_flow4, e22_flow4=$e22_flow4, mx42_flow4=$mx42_flow4 rules=$RULES"
+            sleep 60
+        fi
+    done
+
+    echo "${STATUS}" > ${ANNOUNCEMENTS_STATUS_FILE}
+    logit "${STATUS}"
+}
+
+# Use status for TODAY (yesterday) and TODAY (today till now) for restartcount* not status service ...
+function batch_status()
+{
+    # hmm, her skal kun sendes breve hvis $errors != 0, og kun en gang i timen evt. med en stopklods, så vi kun sender et vist
+    # antal breve pr. døgn.
+    # se /opt/i2dps/tmp/watchdog.sh.now.SH	/opt/i2dps/tmp/watchdog.sh.yesterday.SH
+    # kør en gang i døgnet og check /opt/i2dps/tmp/watchdog.sh.yesterday.SH
+
+    local TMPFILE=/tmp/$$
+    local TMPFILE2=/tmp/tmp.$$
+    local RES=/tmp/res.$$
+    local STAT=/tmp/stat.$$
+    logit "batch status check"
+    /bin/rm -f ${CSVFILE}
+    echo "select hostname, status from flow.fastnetmoninstances where status not like 'offline';"|
+    sudo su postgres -c "cd /tmp; psql -t -d netflow" | sed 's/|//; /^\s*$/d' |
+    while read hostname dbstatus rest of line
+    do
+        logit "ssh ... ${hostname} ... "
+        ssh -o ConnectTimeout=5 -n ${hostname} 'test -f /opt/i2dps/tmp/watchdog.sh.yesterday.SH && cat /opt/i2dps/tmp/watchdog.sh.yesterday.SH' >$RES 2>$TMPFILE 
+        local errors=$?
+        ssh -o ConnectTimeout=5 -n ${hostname} 'service fastnetmon status; service influxd status' | sed 's/$/<br>/' > $STAT 
+        echo `cat $STAT` > $TMPFILE2
+        /bin/mv $TMPFILE2 $STAT
+        case $errors in
+            0)
+                ( . $RES; result="Influxd restarted $INFLUXD_RESTART_COUNT times yesterday<br>FastNetMon restarted $FASTNETMON_RESTART_COUNT times yesterday<br>OpenVPN restarted $VPN_RESTART_COUNT times yesterday<br> `cat $STAT`";
+                    echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
+                )
+                rm -f $TMPFILE $RES $STAT $TMPFILE2
                 ;;
-             *)  S="`timeout  -k ${TIMEOUT} ${TIMEOUT} sudo ssh ${hostname} \"service fastnetmon status; service influxd status\"`"
-                 S="`echo $S`"
-                 echo "$S"
+            *)  result="`cat $TMPFILE`"
+                echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
+                rm -f $TMPFILE $RES $STAT $TMPFILE2
                 ;;
         esac
     done
+
+    local ERRORS=0
+    ERRORS=`awk -F';' 'BEGIN { ERRORS = 0; } $3 != 0 && $2 != "offline" { ERRORS++; } END { print ERRORS }' ${CSVFILE}`
+
+    # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
+    local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
+    ERRORS=$((ERRORS + AERRORS))
+
+    case $ERRORS in
+      0)    logit "no errors everything running as expected, bye"
+            make_html_report $ERRORS
+            rm -f ${CSVFILE}
+      ;;
+      *)    logit "found $ERRORS errors, sending report by mail"
+            make_html_report $ERRORS
+            # hack: ww1 and ww2 not able to send mail, call $0 fron buh which is able to do so
+            cat ${REPORT_FILE}
+            rm -f ${CSVFILE} ${ANNOUNCEMENTS_STATUS_FILE}
+      ;;
+    esac
+}
+
+
+function make_html_report()
+{
+    logit "Errors = $1" # p.t not used
+    logit "making report"
+    cat << EOF > ${REPORT_FILE}
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf8">
+<TITLE>DDPS fnm status</TITLE>
+<style TYPE="text/css">
+.unistyle table { border-collapse: collapse; text-align: left; width: 100%; }
+.unistyle {font: normal 12px/150% Arial, Helvetica, sans-serif; background: #fff; overflow: hidden; border: 1px solid #006699; -webkit-border-radius: 3px; -moz-border-radius: 3px; border-radius: 3px; }
+.unistyle table td,
+.unistyle table th { padding: 3px 10px; }
+.unistyle table thead th {background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #006699), color-stop(1, #00557F) );background:-moz-linear-gradient( center top, #006699 5%, #00557F 100% );filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#006699', endColorstr='#00557F');background-color:#006699; color:#FFFFFF; font-size: 15px; font-weight: bold; border-left: 1px solid #0070A8; }.unistyle table thead th:first-child { border: none; }
+.unistyle table tbody td { color: #00496B; border-left: 1px solid #E1EEF4;font-size: 12px;font-weight: normal; }
+.unistyle table tbody .alt td { background: #E1EEF4; color: #00496B; }
+.unistyle table tbody .bad td { background: #FFF8C6; color: #00496B; }
+.unistyle table tbody td:first-child { border-left: none; }
+.unistyle table tbody tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="unistyle">
+<table frame="VOID" cellspacing="1" cols="1" rules="NONE" border="1"><tbody><tr><td>
+<h1>DDPS fnm status</h1>
+<p>
+Comparison between database status and real status of FastNetMon hosts.
+</p>
+<table>
+<thead><tr><th>hostname</th><th>database status</th><th>Exit status</th><th>Description</th></tr></thead>
+<tbody>
+EOF
+
+        awk -F';' '
+        BEGIN {
+            ALT = 0 ;
+        }
+        {
+            if ($3 != 0 && $2 != "offline")
+            {
+                print "<tr class=\"bad\"><td>" $1 "</td><td>" $2 "</td><td>" $3 "</td><td>" $4"</td></tr>"
+                if (ALT == 0)
+                {
+                    ALT = 1;
+                }
+                next
+            }
+
+            if (ALT == 0)
+            {
+                print "<tr><td>" $1 "</td><td>" $2 "</td><td>" $3 "</td><td>" $4"</td></tr>"
+                ALT = 1
+                next
+            }
+            else
+            {
+                print "<tr class=\"alt\"><td>" $1 "</td><td>" $2 "</td><td>" $3 "</td><td>" $4"</td></tr>"
+                ALT = 0
+                next
+            }
+        }
+    ' ${CSVFILE} >> ${REPORT_FILE}
+
+    cat << EOF >> ${REPORT_FILE}
+</tbody>
+</table>
+<p>
+Comparing active rules in database with announcements:<br/>
+EOF
+
+cat ${ANNOUNCEMENTS_STATUS_FILE} >> ${REPORT_FILE}
+
+cat << EOF >> ${REPORT_FILE}
+</p>
+</div>
+</body></html>
+EOF
+
+    logit "report done - status=$STATUS"
 }
 
 function db2cfg()
@@ -710,8 +814,8 @@ function db2cfg()
     logit "exporting db to config files  ... "
     test -n "${dbpassword}" || usage missing dbpassword
     test -n "${SQL}"        || usage missing sql statement
-
-    local TMPDIR=`mktemp -p /tmp/tmpdir -d XXX.db2cfg`
+    test -d ${WORKDIR} || mkdir ${WORKDIR}
+    local TMPDIR=`mktemp -p ${WORKDIR} -d XXX.db2cfg`
     logit "tmpdir: ${TMPDIR}"
     local OLDDIR=`pwd`
     cd ${TMPDIR}
@@ -1121,10 +1225,12 @@ function main()
 
     test -d  ${WORKDIR} || mkdir ${WORKDIR}
 
-    while getopts adcepgli:n:mvhus opt
+    while getopts abdcepgli:n:mvhus opt
     do
     case $opt in
         a)  DO=addcfgtodb
+            ;;
+        b)  DO=batch_status
             ;;
         i)  SQL="select
              *\x

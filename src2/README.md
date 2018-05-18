@@ -94,11 +94,14 @@ Add the new host to database with
 
     cat add_new_fastnetmon.sql | sudo su postgres -c "cd /tmp; psql -d netflow"
 
-Create ssh keys with the command
+Create ssh keys with the command (rsa due to perl library not working with ed keys)
+<!--  ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t ed25519 -f id_ed25519 -->
 
-     ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t 25519 -f id_ed25519
+     ssh-keygen -C "fastnetmon02.vpn.ddps.deic.dk@192.168.67.2" -N '' -t rsa -b 4096 -f id_rsa
 
-Add the new key **on both** `ww1.ddps` and `ww2.ddps`with
+Add the new key **on both** `ww1.ddps` and `ww2.ddps`with `edit_authorized_keys` which
+opens `vi`on `home/sftpgroup/newrules/.ssh/authorized_keys` and `scp` the file to the other
+host afterwards, or this way:
 
 ``````
 grep fastnetmon02.vpn.ddps.deic.dk@192.168.67.2 /home/sftpgroup/newrules/.ssh/authorized_keys
@@ -142,13 +145,13 @@ And do a rollback if one or more tests fails. But as for now, it doesn't.
 `fnmcfg` also runs in the background watching for configuration changes which
 must be applied. Changing the field _status_ to _pending_ will trigger an update. Valid words are:
 
-| Word           | Description |
-| -------------- | ----------- |
-| unconfigured   | New unconfigured system |
-| pending        | System changes waiting to be enforced |
-| updated        | System is up to date |
-| failed         | Enforcing changed has failed or system is down |
-| shotdown       | System deliberately out of reach |
+| Word           | Description                                      |
+| -------------- | ------------------------------------------------ |
+| unconfigured   | New unconfigured system                          |
+| pending        | System changes waiting to be enforced            |
+| updated        | System is up to date                             |
+| failed         | Enforcing changed has failed or system is down   |
+| offline        | System deliberately out of reach                 |
 
 The table should not be edited directly. The service is started by _systemd_,
 and is _pgpool2_ aware. Status may be shown with:

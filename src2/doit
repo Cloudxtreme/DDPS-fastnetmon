@@ -1,6 +1,16 @@
+#! /usr/bin/env bash
 
-rsync -avzH --exclude '*.bak' * ww2:tmp/src/; ssh ww2 'cd tmp/src; sudo make install; /opt/db2dps/bin/fnmcfg -v -s '
+T=ww2
+
+rsync -avzH --exclude '*.bak' * ${T}:tmp/src/; ssh ${T} 'cd tmp/src; sudo make install;'
+/bin/rm -f /tmp/relport.html
+ssh ${T} 'sudo /opt/db2dps/bin/fnmcfg -b ' > /tmp/report.html
+
+if [ -s /tmp/report.html ]; then
+    echo send report
+else
+    echo no report
+fi
+
 exit 0
-# ssh ww2 'cd /tmp; sudo rm -fr x; sudo mkdir x; cd x; sudo fnmcfg -v -u -n fastnetmon05.vpn.ddps.deic.dk'
 
-ssh ww2 'cd /tmp/; rm -f /tmp/stop; sudo fnmcfg -v -l'
