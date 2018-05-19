@@ -39,7 +39,9 @@ FASTEST_INTERFACE=""
 UPLINK=""
 UUID=""
 
-#INCLUDE_VERSION_SH
+version="1.0-1"
+build_date="2018-05-18 15:57"
+build_git_sha=""
 # functions
 
 function logit() {
@@ -638,6 +640,7 @@ function status()
       *)    echo "found $ERRORS errors please investigate"
       ;;
     esac
+
 }
 
 function check_announcements_matches_db()
@@ -685,19 +688,19 @@ function batch_status()
     do
         logit "ssh ... ${hostname} ... "
         ssh -o ConnectTimeout=5 -n ${hostname} 'test -f /opt/i2dps/tmp/watchdog.sh.yesterday.SH && cat /opt/i2dps/tmp/watchdog.sh.yesterday.SH' >$RES 2>$TMPFILE 
-        local ERRORS=$?
+        local errors=$?
         ssh -o ConnectTimeout=5 -n ${hostname} 'service fastnetmon status; service influxd status' | sed 's/$/<br>/' > $STAT 
         echo `cat $STAT` > $TMPFILE2
         /bin/mv $TMPFILE2 $STAT
-        case $ERRORS in
+        case $errors in
             0)
                 ( . $RES; result="Influxd restarted $INFLUXD_RESTART_COUNT times yesterday<br>FastNetMon restarted $FASTNETMON_RESTART_COUNT times yesterday<br>OpenVPN restarted $VPN_RESTART_COUNT times yesterday<br> `cat $STAT`";
-                    echo "$hostname;$dbstatus;$ERRORS;$result" >> ${CSVFILE}
+                    echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
                 )
                 rm -f $TMPFILE $RES $STAT $TMPFILE2
                 ;;
             *)  result="`cat $TMPFILE`"
-                echo "$hostname;$dbstatus;$ERRORS;$result" >> ${CSVFILE}
+                echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
                 rm -f $TMPFILE $RES $STAT $TMPFILE2
                 ;;
         esac
@@ -789,9 +792,6 @@ EOF
             }
         }
     ' ${CSVFILE} >> ${REPORT_FILE}
-        # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
-        local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
-        ERRORS=$((ERRORS + AERRORS))
 
     cat << EOF >> ${REPORT_FILE}
 </tbody>
@@ -808,7 +808,7 @@ cat << EOF >> ${REPORT_FILE}
 </body></html>
 EOF
 
-    logit "report done - status=$ERRORS"
+    logit "report done - status=$STATUS"
 }
 
 function db2cfg()

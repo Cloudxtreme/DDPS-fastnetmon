@@ -418,7 +418,7 @@ function updatecfg()
 {
     # assume we are in a empty directory
     test -d ${WORKDIR} || mkdir ${WORKDIR}
-    local TMPDIR=`mktemp -p ${WORKDIR} -d XXXXXXXXXX.updatecfg`
+    local TMPDIR=`mktemp -p ${WORKDIR} -d XXX.updatecfg`
 
     # export and check the data
     db2cfg
@@ -486,7 +486,7 @@ function updatecfg()
 function edit()
 {
     test -d ${WORKDIR} || mkdir ${WORKDIR}
-    local TMPDIR=`mktemp -p ${WORKDIR} -d XXXXXXXXXX.edit`
+    local TMPDIR=`mktemp -p ${WORKDIR} -d edit.XXXXXXXXXX`
     local OLDDIR=`pwd`
     cd ${TMPDIR}
 
@@ -518,7 +518,7 @@ function edit()
 function loop()
 {
     test -d ${WORKDIR} || mkdir ${WORKDIR}
-    local TMPDIR=`mktemp -p ${WORKDIR} -d XXXXXXXXXX.loop`
+    local TMPDIR=`mktemp -p ${TMPDIR} -d XXX.loop`
     cd ${TMPDIR}
 
     # loop master/client?
@@ -628,27 +628,18 @@ function status()
     echo ""
     echo "Announcements (rules) staus: "
     echo "${STATUS}"
-    # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
-    local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
-    ERRORS=$((ERRORS + AERRORS))
-    
-    case $ERRORS in
-      0)    echo "no errors everything running as expected, bye"
-      ;;
-      *)    echo "found $ERRORS errors please investigate"
-      ;;
-    esac
 }
 
 function check_announcements_matches_db()
 {
     # rules etc. must match - require bird on yet an other host
+    # TODO: loop (max 2) with a break on OK and a sleep on 1 min on ERROR
 
-    for TEST in 1 2 3 4 5
+    for TEST in 1 2
     do
-        local e21_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.e21_flow4| .active] | .[]' | sed 's/"//g'`
-        local e22_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.e22_flow4| .active] | .[]' | sed 's/"//g'`
-        local mx42_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.mx42_flow4| .active] | .[]' | sed 's/"//g'`
+        local e21_flow4=`curl -X GET -H 'Accept:application/json' http://172.22.86.20:5000/tableinfo/ 2>/dev/null | jq '[.e21_flow4| .active] | .[]' | sed 's/"//g'`
+        local e22_flow4=`curl -X GET -H 'Accept:application/json' http://172.22.86.20:5000/tableinfo/ 2>/dev/null | jq '[.e22_flow4| .active] | .[]' | sed 's/"//g'`
+        local mx42_flow4=`curl -X GET -H 'Accept:application/json' http://172.22.86.20:5000/tableinfo/ 2>/dev/null | jq '[.mx42_flow4| .active] | .[]' | sed 's/"//g'`
 
         local RULES=`sudo su postgres -c "cd /tmp; echo 'SELECT distinct COUNT(*) from flow.flowspecrules where not isexpired \x\a\f =' |psql -d netflow -q" | sed 's/count=//'`
 
@@ -663,6 +654,7 @@ function check_announcements_matches_db()
 
     echo "${STATUS}" > ${ANNOUNCEMENTS_STATUS_FILE}
     logit "${STATUS}"
+    local ERROR=`echo ${STATUS} | awk -F':' { print $1 }'`
 }
 
 # Use status for TODAY (yesterday) and TODAY (today till now) for restartcount* not status service ...
@@ -672,7 +664,7 @@ function batch_status()
     # antal breve pr. døgn.
     # se /opt/i2dps/tmp/watchdog.sh.now.SH	/opt/i2dps/tmp/watchdog.sh.yesterday.SH
     # kør en gang i døgnet og check /opt/i2dps/tmp/watchdog.sh.yesterday.SH
-
+    
     local TMPFILE=/tmp/$$
     local TMPFILE2=/tmp/tmp.$$
     local RES=/tmp/res.$$
@@ -680,48 +672,46 @@ function batch_status()
     logit "batch status check"
     /bin/rm -f ${CSVFILE}
     echo "select hostname, status from flow.fastnetmoninstances where status not like 'offline';"|
-    sudo su postgres -c "cd /tmp; psql -t -d netflow" | sed 's/|//; /^\s*$/d' |
-    while read hostname dbstatus rest of line
-    do
-        logit "ssh ... ${hostname} ... "
-        ssh -o ConnectTimeout=5 -n ${hostname} 'test -f /opt/i2dps/tmp/watchdog.sh.yesterday.SH && cat /opt/i2dps/tmp/watchdog.sh.yesterday.SH' >$RES 2>$TMPFILE 
-        local ERRORS=$?
-        ssh -o ConnectTimeout=5 -n ${hostname} 'service fastnetmon status; service influxd status' | sed 's/$/<br>/' > $STAT 
-        echo `cat $STAT` > $TMPFILE2
-        /bin/mv $TMPFILE2 $STAT
-        case $ERRORS in
-            0)
-                ( . $RES; result="Influxd restarted $INFLUXD_RESTART_COUNT times yesterday<br>FastNetMon restarted $FASTNETMON_RESTART_COUNT times yesterday<br>OpenVPN restarted $VPN_RESTART_COUNT times yesterday<br> `cat $STAT`";
-                    echo "$hostname;$dbstatus;$ERRORS;$result" >> ${CSVFILE}
-                )
-                rm -f $TMPFILE $RES $STAT $TMPFILE2
-                ;;
-            *)  result="`cat $TMPFILE`"
-                echo "$hostname;$dbstatus;$ERRORS;$result" >> ${CSVFILE}
-                rm -f $TMPFILE $RES $STAT $TMPFILE2
-                ;;
-        esac
-    done
+    sudo su postgres -c "cd /tmp; psql -t -d netflow" |
+          sed 's/|//; /^\s*$/d' |
+          while read hostname dbstatus rest of line
+          do
+              logit "ssh ... ${hostname} ... "
+              ssh -o ConnectTimeout=5 -n ${hostname} 'test -f /opt/i2dps/tmp/watchdog.sh.yesterday.SH && cat /opt/i2dps/tmp/watchdog.sh.yesterday.SH' >$RES 2>$TMPFILE 
+              errors=$?
+              ssh -o ConnectTimeout=5 -n ${hostname} 'service fastnetmon status; service influxd status' | sed 's/$/<br>/' > $STAT 
+              echo `cat $STAT` > $TMPFILE2
+              mv $TMPFILE2 $STAT
+              case $errors in
+                  0)
+                      ( . $RES; result="Influxd restarted $INFLUXD_RESTART_COUNT times yesterday<br>FastNetMon restarted $FASTNETMON_RESTART_COUNT times yesterday<br>OpenVPN restarted $VPN_RESTART_COUNT times yesterday<br> `cat $STAT`";
+                          echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
+                      )
+                      rm -f $TMPFILE $RES $STAT $TMPFILE2
+                      ;;
+                  *)  result="`cat $TMPFILE`"
+                      echo "$hostname;$dbstatus;$errors;$result" >> ${CSVFILE}
+                      rm -f $TMPFILE $RES $STAT $TMPFILE2
+                      ;;
+              esac
+      done
 
-    local ERRORS=0
-    ERRORS=`awk -F';' 'BEGIN { ERRORS = 0; } $3 != 0 && $2 != "offline" { ERRORS++; } END { print ERRORS }' ${CSVFILE}`
+      ERRORS=`awk -F';' 'BEGIN { ERRORS = 0; } $3 != 0 && $2 != "offline" { ERRORS++; } END { print ERRORS }' ${CSVFILE}`
 
-    # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
-    local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
-    ERRORS=$((ERRORS + AERRORS))
-
-    case $ERRORS in
-      0)    logit "no errors everything running as expected, bye"
-            make_html_report $ERRORS
-            rm -f ${CSVFILE}
-      ;;
-      *)    logit "found $ERRORS errors, sending report by mail"
-            make_html_report $ERRORS
-            # hack: ww1 and ww2 not able to send mail, call $0 fron buh which is able to do so
-            cat ${REPORT_FILE}
-            rm -f ${CSVFILE} ${ANNOUNCEMENTS_STATUS_FILE}
-      ;;
-    esac
+      # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
+      logit "Errors: $ERRORS"
+      case $ERRORS in
+          0)    logit "no errors everything running as expected, bye"
+                make_html_report $ERRORS
+                rm -f ${CSVFILE}
+          ;;
+          *)    logit "found $ERRORS errors, sending report by mail"
+                make_html_report $ERRORS
+                # hack: ww1 and ww2 not able to send mail, call $0 fron buh which is able to do so
+                cat ${REPORT_FILE}
+                rm -f ${CSVFILE} ${ANNOUNCEMENTS_STATUS_FILE}
+          ;;
+      esac
 }
 
 
@@ -789,9 +779,6 @@ EOF
             }
         }
     ' ${CSVFILE} >> ${REPORT_FILE}
-        # check errors in ${ANNOUNCEMENTS_STATUS_FILE}
-        local AERRORS=`awk -F':' '{ print $1 }' ${ANNOUNCEMENTS_STATUS_FILE}`
-        ERRORS=$((ERRORS + AERRORS))
 
     cat << EOF >> ${REPORT_FILE}
 </tbody>
@@ -808,7 +795,7 @@ cat << EOF >> ${REPORT_FILE}
 </body></html>
 EOF
 
-    logit "report done - status=$ERRORS"
+    logit "report done - status=$STATUS"
 }
 
 function db2cfg()
@@ -817,7 +804,7 @@ function db2cfg()
     test -n "${dbpassword}" || usage missing dbpassword
     test -n "${SQL}"        || usage missing sql statement
     test -d ${WORKDIR} || mkdir ${WORKDIR}
-    local TMPDIR=`mktemp -p ${WORKDIR} -d XXXXXXXXXX.db2cfg`
+    local TMPDIR=`mktemp -p ${WORKDIR} -d XXX.db2cfg`
     logit "tmpdir: ${TMPDIR}"
     local OLDDIR=`pwd`
     cd ${TMPDIR}
@@ -1225,7 +1212,7 @@ function main()
     default_uuid_administratorid=`sed '/^default_uuid_administratorid/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
     bootstrap_ip=`sed '/^bootstrap_ip/!d; s/.*=[\t ]*//g' /opt/db2dps/etc/fnmcfg.ini`
 
-    test -d  "${WORKDIR}" || mkdir ${WORKDIR}
+    test -d  ${WORKDIR} || mkdir ${WORKDIR}
 
     while getopts abdcepgli:n:mvhus opt
     do
