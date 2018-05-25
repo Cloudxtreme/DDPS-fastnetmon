@@ -225,21 +225,23 @@ Finally you may check the status for all fastnetmon instances with the command
 Example output:
 
 ````````bash
-Status according to database
+12:35:25 (25/05) Starting /opt/db2dps/bin/fnmcfg
+Expected status:
            hostname            |  status  |                               notes
 -------------------------------+----------+--------------------------------------------------------------------
- fnm.deic.dk                   | down     | system does no longer exist
-                               |          |
- fastnetmon02.vpn.ddps.deic.dk |          |
- fastnetmon04.vpn.ddps.deic.dk |          |
+ fastnetmon02.vpn.ddps.deic.dk | offline  | Virtuel testmaskine der normalt er slukket
+ fastnetmon04.vpn.ddps.deic.dk | uptodate | Ny fnm i M1, E2
  fastnetmon03.vpn.ddps.deic.dk | uptodate | Ny fnm i M1, E2 - vi skal have fundet en anvendelse og net til den
- fastnetmon05.vpn.ddps.deic.dk | uptodate |
-(6 rows)
+ fastnetmon05.vpn.ddps.deic.dk | offline  | Virtuel testmaskine der normalt er slukket
 
-Status from ssh to host
-fnm.deic.dk not tested: system down
-fastnetmon02.vpn.ddps.deic.dk not tested: system down
-fastnetmon04.vpn.ddps.deic.dk not tested: system down
-fastnetmon03.vpn.ddps.deic.dk fastnetmon is running as pid 2622. influxd is running as pid 2612.
+Real status:
+fastnetmon04.vpn.ddps.deic.dk fastnetmon is running as pid 56465. influxd is running as pid 921.
+fastnetmon03.vpn.ddps.deic.dk fastnetmon is running as pid 14788. influxd is running as pid 2612.
+/opt/db2dps/bin/fnmcfg: line 671: /tmp/tmpdir/announcements_status.txt: Permission denied
+12:35:26 (25/05) ok: 0 announcements in database, exabgp1,2 and mx80
+
+Announcements (rules) staus:
+ok: 0 announcements in database, exabgp1,2 and mx80
+no errors everything running as expected, bye
 ````````
 

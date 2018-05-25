@@ -14,7 +14,7 @@ UPDATE flow.fastnetmoninstances
     --      accept: monitor only -- creating dummy rules
     mode = '${mode}',
     networks_whitelist = '${networks_whitelist}',
-    blocktime = '${blcktime}',
+    blocktime = '${blocktime}',
     process_incoming_traffic = '${process_incoming_traffic}',
     process_outgoing_traffic = '${process_outgoing_traffic}',
     ban_time = '${ban_time}',
