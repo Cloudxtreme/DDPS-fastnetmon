@@ -650,13 +650,18 @@ function check_announcements_matches_db()
         local e22_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.e22_flow4| .active] | .[]' | sed 's/"//g'`
         local mx42_flow4=`curl -X GET -H 'Accept:application/json' http://lg.ddps.deic.dk:5000/tableinfo/ 2>/dev/null | jq '[.mx42_flow4| .active] | .[]' | sed 's/"//g'`
 
-        local RULES=`sudo su postgres -c "cd /tmp; echo 'SELECT distinct COUNT(*) from flow.flowspecrules where not isexpired \x\a\f =' |psql -d netflow -q" | sed 's/count=//'`
+        # local RULES=`sudo su postgres -c "cd /tmp; echo 'SELECT distinct COUNT(*) from flow.flowspecrules where not isexpired \x\a\f =' |psql -d netflow -q" | sed 's/count=//'`
+        # this is actually the number of uniq rules in the db; the db may contain a number of identical rules e.g. blocking icmp from src to dst
+        # Oh yes, this may go utterly wrong and should like the rest be re-written in an other language
+        local RULES=`sudo su postgres -c "cd /tmp; echo 'SELECT distinct destinationprefix,sourceprefix,ipprotocol,srcordestport,destinationport,sourceport,icmptype,icmpcode,tcpflags,packetlength,packetlength,fragmentencoding from flow.flowspecrules where not isexpired' | psql -d netflow -q"|
+        awk -F'|' '$1 ~ /rows\)/ { next }; $0 ~ /---+--/ { next}; $1 ~ /destinationprefix/ { next }; { print $1 " " $2 " " $3 " " $4 " " $5 " " $6 "" $7 " " $8 " " $9 " " $10 " " $11 " " $12 }'| sed -e "s/  */ /g; s/^[ ]*//; s/[ ]*$//; /^$/d" | wc -l`
 
         if [ "$e21_flow4" = "$e22_flow4" ] && [ "$e22_flow4" = "$mx42_flow4" ] && [ "$e22_flow4" = "$RULES" ]; then
             STATUS="ok: $RULES announcements in database, exabgp1,2 and mx80"
             break
         else
             STATUS="error: e21_flow4=$e21_flow4, e22_flow4=$e22_flow4, mx42_flow4=$mx42_flow4 rules=$RULES"
+            logit "warning: e21_flow4=$e21_flow4, e22_flow4=$e22_flow4, mx42_flow4=$mx42_flow4 rules=$RULES, sleeping 60 seconds ... "
             sleep 60
         fi
     done

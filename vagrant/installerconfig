@@ -63,27 +63,47 @@ EOF
 mkdir -p /usr/local/etc/rc.d
 chmod 755 /usr/local/etc/rc.d
 
-
 ## Create a first time boot setup script that runs only once,
 ## after a successful installation with the custom ISO.
-cat <<EOF > /usr/local/etc/rc.d/rc.firsttime.sh
+cat <<'EOF' > /usr/local/etc/rc.d/rc.firsttime.sh
+# !/bin/sh
 # REQUIRE: NETWORKING
 # BEFORE: LOGIN
 
+PAGER=cat
+export PAGER
+
+ASSUME_ALWAYS_YES=YES
+export ASSUME_ALWAYS_YES
+
+LOGFILE="/var/log/rc.firsttime.sh.log"
+
+echo "`date`: $0 starting" 2>&1 |tee $LOGFILE
+
+echo "`date`: $0 installing updates ... " 2>&1 |tee -a $LOGFILE
 # FreeBSD RELEASE updates
-env PAGER=cat freebsd-update fetch
-env PAGER=cat freebsd-update install
+freebsd-update fetch   2>&1 |tee -a $LOGFILE
+freebsd-update install 2>&1 |tee -a $LOGFILE
 
+echo "`date`: $0 installing upgrades ... " 2>&1 |tee -a $LOGFILE
 # Update packages
-env ASSUME_ALWAYS_YES=YES pkg update -f
-env ASSUME_ALWAYS_YES=YES pkg upgrade -q -y
+pkg update -f 2>&1 |tee -a $LOGFILE
+pkg upgrade -q -y 2>&1 |tee -a $LOGFILE
 
+echo "`date`: $0 installing packages ... " 2>&1 |tee -a $LOGFILE
 # Install packages
-env ASSUME_ALWAYS_YES=YES pkg install -q -y openvpn fastnetmon influxdb openvpn tmux bash vim-lite zsh pkt-gen mtr-nox11 sudo rsync
+for PKG in openvpn fastnetmon influxdb tmux bash zsh pkt-gen mtr-nox11 sudo rsync
+do
+    echo "`date`: installing $PKG ... " 2>&1 |tee -a $LOGFILE
+    pkg install -q -y $PKG 2>&1 |tee -a $LOGFILE
+done
 
+echo "`date`: $0 removing packages ... " |tee -a $LOGFILE
 # Clean packages
-env ASSUME_ALWAYS_YES=YES pkg autoremove
-env ASSUME_ALWAYS_YES=YES pkg clean -a
+pkg autoremove 2>&1 |tee -a $LOGFILE
+pkg clean -a 2>&1 |tee -a $LOGFILE
+
+echo "`date`: $0 done. Rebooting " 2>&1 |tee -a $LOGFILE
 
 # Remove the script after first run
 /bin/rm -rf /usr/local/etc/rc.d/rc.firsttime.sh
