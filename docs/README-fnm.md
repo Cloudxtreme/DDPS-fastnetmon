@@ -4,16 +4,6 @@
 This is a set of ad-hoc tools. Part of the functionality will be obsoleted once the
 Web-UI supersedes it.
 
-## Installation
-
-This directory contains helper scripts. The scripts must be installed on `ww1`
-and `ww2`. The installation is done with `make install`, which will also
-install configuration templates for `infludb` and `fastnetmon`.
-
-Install the scripts with
-
-    rsync -avzH . ww2:/tmp; ssh ww2 'cd /tmp; make install'
-
 ## Usage - add a new FastNetMon instance
 
 Assume the host should be owned by Netdrift, have the VPN IP address
