@@ -1,5 +1,17 @@
 
-# Boot image building instructions
+# Creating a boot image or building the `i2dps` notification script package
+
+## Creating the `i2dps` notification script package
+
+`i2dps` is installed as a FreeBSD package, which requires a FreeBSD for
+the package build. Building is done with:
+
+    vagrant box update
+    SHELL_ARGS="pkg" vagrant --provision up
+
+The package will be written to `.`. For installation see `fnmcfg`.
+
+## Boot image building instructions
 
 This is a description for creating a FreeBSD 11 boot ISO and DMG with Vagrant
 for unattended installation of FastNetMon and influxd, as used in the DDPS
@@ -45,11 +57,8 @@ should at least contain the files below:
 
 Execute from the directory containing the two textfiles:
 
-    vagrant up
-
-Followed by
-
-    vagrant provision
+    vagrant box update
+    SHELL_ARGS="iso" vagrant --provision up
 
 Which will fetch and start the FreeBSD box image, NFS mount the directory
 inside the box then fetch the official FreeBSD 11 installation image to

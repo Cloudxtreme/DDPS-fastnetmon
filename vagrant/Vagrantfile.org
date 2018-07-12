@@ -1,0 +1,51 @@
+ISOURI  = "http://ftp.freebsd.org/pub/FreeBSD/releases/ISO-IMAGES/11.1/FreeBSD-11.1-RELEASE-amd64-disc1.iso"
+ISOFILE = ISOURI.match(/.*\/(.+.iso)/)[1]    # eg. FreeBSD-11.1-RELEASE-amd64-bootonly.iso
+NEWISO  = ISOFILE.dup.insert(-5,"-custom")   # eg. FreeBSD-11.1-RELEASE-amd64-bootonly-custom.iso
+
+Vagrant.configure("2") do |config|
+  config.vm.guest = :freebsd
+  # Synced_folder is not supported on FreeBSD yet, use NFS
+  config.vm.synced_folder ".", "/vagrant", :nfs => true, id: "vagrant-root"
+  config.vm.box = "freebsd/FreeBSD-11.1-RELEASE"
+  config.ssh.shell = "sh"
+  config.vm.network "private_network", ip: "10.200.1.10" # some IP from unused subnet
+  config.vm.base_mac = "080027D14C66"
+
+  config.vm.provider :virtualbox do |vb|
+    vb.customize ["modifyvm", :id, "--memory", "1024"]
+    vb.customize ["modifyvm", :id, "--cpus", "1"]
+    vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+    vb.customize ["modifyvm", :id, "--audio", "none"]
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+  end
+
+  $script = <<SCRIPT
+    echo Setting up ...
+    env ASSUME_ALWAYS_YES=YES pkg install rsync cdrtools
+    echo Fetching #{ISOURI} ...
+    mkdir -p /home/iso
+    fetch -m -o /home/iso/#{ISOFILE} #{ISOURI}
+
+    echo Prepairing #{ISOFILE} ...
+    mkdir -p /mnt/freebsd-iso
+    mdconfig -f /home/iso/#{ISOFILE}
+    mount -t cd9660 /dev/md0 /mnt/freebsd-iso
+    rsync -aq /mnt/freebsd-iso/ /mnt/custom-freebsd-iso
+
+    umount /mnt/freebsd-iso
+    mdconfig -d -u 0
+
+    cp /vagrant/installerconfig /mnt/custom-freebsd-iso/etc/
+
+    CUSTOM_ISO_TITLE=$(isoinfo -d -i /home/iso/#{ISOFILE} | grep "Volume id" | awk '{print $3}')
+    echo Creating iso $CUSTOM_ISO_TITLE into #{NEWISO} ...
+    mkisofs --quiet -J -R -no-emul-boot -V $CUSTOM_ISO_TITLE -p "XNET" -b boot/cdboot -o /vagrant/#{NEWISO} /mnt/custom-freebsd-iso
+
+    cd /vagrant
+    ./fbsd-installiso2img.sh #{NEWISO} #{NEWISO}.dmg
+SCRIPT
+
+  config.vm.provision "shell", inline: $script
+
+end

@@ -1,14 +1,19 @@
 #! /usr/local/bin/bash
 #
-# FreeBSD project
+# FreeBSD project, see https://www.freebsd.org/doc/en/books/porters-handbook/
 #
 # <project>_<major version>.<minor version>-<project revision>
 
 project="i2dps"
 version=`git tag 2>/dev/null | sort -n -t'-' -k2,2 | tail -1`
+
+if [ -z "${version}" ]; then
+    version="1.0-1"
+fi
+
 package=${project}_${version}
-prefix="FreeBSD-${package}/opt/${project}/"
 root="FreeBSD-${package}/"
+prefix="${root}/opt/${project}/"
 manifest="${root}/+MANIFEST"
 pre_deinstall="${root}/+PRE_DEINSTALL"
 post_deinstall="${root}/+POST_DEINSTALL"
@@ -16,9 +21,11 @@ pre_install="${root}/+PRE_INSTALL"
 post_install="${root}/+POST_INSTALL"
 
 plist="${root}/plist"
-rm -fr "${root}"
+if [ -d ${root} ]; then
+    chmod -R 777 ${root}; rm -fr "${root}"
+fi
 
-echo "creating tmp dir ${prefix} .. "
+echo "building pkg in ${prefix} ... "
 
 test -d ${root}/etc/cron.d      || mkdir -p ${root}/etc/cron.d
 test -d ${prefix}/bin           || mkdir -p ${prefix}/bin
@@ -26,9 +33,10 @@ test -d ${prefix}/etc/ssh       || mkdir -p ${prefix}/etc/ssh
 test -d ${prefix}/etc/init.d    || mkdir -p ${prefix}/etc/init.d
 test -d ${prefix}/tmp           || mkdir -p ${prefix}/tmp
 test -d ${prefix}/log           || mkdir -p ${prefix}/log
-chmod -R 0500  ${prefix}
+chmod -R 0755  ${prefix}
 
-BINFILES="fnm2db watchdog-freebsd.sh"
+
+BINFILES="fnm2db watchdog.sh"
 ETCINITDFILES="fnm2dbrc"
 SSHKEYS="id_ed25519.pub id_ed25519"
 INIFILE="fnm2db.ini"
@@ -44,18 +52,16 @@ cp $BINFILES        ${prefix}/bin/
 chown 0:0           ${prefix}/bin/*
 chmod 555           ${prefix}/bin/*
 
-( cd ${prefix}/bin/; rm -f watchdog.sh; mv watchdog-freebsd.sh watchdog.sh )
+# ( cd ${prefix}/bin/; rm -f watchdog.sh; mv watchdog-freebsd.sh watchdog.sh )
 
 cp $INIFILE         ${prefix}/etc/
 chmod 744           ${prefix}/etc/*.ini
 
 chmod -R 700        ${prefix}/etc/ssh
 
-# arch: pkg -vv | awk  '$1 == "ABI" { print $NF }'
-ARCH="FreeBSD:11:amd64"
+ARCH=`pkg -vv | awk  '$1 == "ABI" { print $NF }'| sed 's/\"//g; s/;$//'`
 
-echo "Generating the stub manifest in ${root}/+MANIFEST"
-cat >"$manifest" <<EOF
+cat > "$manifest" << EOF
 name: ${package}
 version: ${version}
 origin: local/${package}
@@ -77,7 +83,6 @@ pkg query "  %n: { version: \"%v\", origin: %o }" p5-Net-SSH2           >> "$man
 echo "}"                                                                >> "$manifest"
 
 # https://github.com/freebsd/pkg
-echo "Generating the directory and file list fro ${root} ... "
 (
     cd $root
     echo "files: {"
@@ -106,7 +111,6 @@ cat >> ${pre_deinstall} <<EOF
 :
 EOF
 
-echo "creating plist ... "
 echo "/opt/i2dps/etc/${INIFILE}" > ${plist}
 
 pkg create -r ${root}/ -m ${root} -o .
@@ -117,7 +121,7 @@ if [ -f "${file}" ]; then
     /bin/mv ${file} ${package}_${version}.txz
 fi
 
-echo made *txz
+echo package for installation: *txz
 
 exit 0
 

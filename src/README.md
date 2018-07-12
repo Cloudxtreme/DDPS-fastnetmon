@@ -1,6 +1,14 @@
 
 # Source for fastnetmon notification script
 
+TODO: also fix this
+
+We have shifted from Debian to FreeBSD, making the notification script is done with
+
+        bash mk-freebsd.sh
+
+The `Makefile` is not used.
+
 The _fastnetmon notification script_ is written in Perl and requires some Perl modules which
 may be installed as Debian packages.
 

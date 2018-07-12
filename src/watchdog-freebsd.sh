@@ -11,7 +11,7 @@ IDB=influxd
 
 for D in $FNM $IDB
 do
-	$service ${D} status #>/dev/null
+	$service ${D} status >/dev/null
 	case $? in
 		0)	$logger "${D} running ok"
 		;;

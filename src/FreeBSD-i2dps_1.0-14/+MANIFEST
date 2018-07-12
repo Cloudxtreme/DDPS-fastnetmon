@@ -1,0 +1,29 @@
+name: i2dps_1.0-14
+version: 1.0-14
+origin: local/i2dps_1.0-14
+comment: DDPS Notification script for FastNetMon
+arch: FreeBSD:11:amd64
+www: https://www.deic.dk
+maintainer: Niels Thomas Haugård
+prefix: /
+desc: Perl version of DDPS notification script used by FastNetMon
+Categories: local
+deps: {
+  perl5: { version: "5.26.2", origin: lang/perl5.26 }
+}
+files: {
+  /etc/cron.d/watchdog: { sum: 756565fa6bc24c2d3d74cc4a8032cbe67b0d38be21045585fcefbc7b20c555b0, uname: root, gname: wheel, perm: 0640 }
+  /opt/i2dps/bin/fnm2db: { sum: 40782b966a28f0d8190b9dee28dcb15b45b954a3c4ddacf37e0eb9e2610a6f80, uname: root, gname: wheel, perm: 0555 }
+  /opt/i2dps/bin/watchdog.sh: { sum: 4a8711ede8d02f3711e047084dd6972c0360380ed3cd52870ebce3a9182e5ab6, uname: root, gname: wheel, perm: 0555 }
+  /opt/i2dps/etc/fnm2db.ini: { sum: 58876a9a73c473fab8a4067ccb45703749e2b11ce0fbe7bbde2b9d27d962eba5, uname: root, gname: wheel, perm: 0744 }
+}
+directories: {
+  /opt: 'y';
+  /opt/i2dps: 'y';
+  /opt/i2dps/bin: 'y';
+  /opt/i2dps/etc: 'y';
+  /opt/i2dps/etc/init.d: 'y';
+  /opt/i2dps/etc/ssh: 'y';
+  /opt/i2dps/log: 'y';
+  /opt/i2dps/tmp: 'y';
+}
