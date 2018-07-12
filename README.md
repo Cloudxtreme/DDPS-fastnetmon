@@ -11,8 +11,8 @@ A set of scripts helps to facilitate this; some must be installed on DDPS while 
 may live on your laptop during the creation of the boot image.
 
   - [Creating FreeBSD 11 bootstrap image](vagrant/README.md) with [Vagrant](https://www.vagrantup.com)
-  - [Add net FastNetMon host, edit configuration](src2/README.md)
-  - [General (not updated) documentation](docs/README-fnm.md)
+  - [Add net FastNetMon host, edit configuration](docs/README-fnm.md)
+  - [General (not updated) documentation](docs/README.md)
 
 ## License
 
