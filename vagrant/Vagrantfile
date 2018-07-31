@@ -1,0 +1,28 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ISOURI  = "http://ftp.freebsd.org/pub/FreeBSD/releases/ISO-IMAGES/11.1/FreeBSD-11.1-RELEASE-amd64-disc1.iso"
+ISOFILE = ISOURI.match(/.*\/(.+.iso)/)[1]    # eg. FreeBSD-11.1-RELEASE-amd64-bootonly.iso
+
+Vagrant.configure("2") do |config|
+  config.vm.guest = :freebsd
+  # Synced_folder is not supported on FreeBSD yet, use NFS
+  config.vm.synced_folder ".", "/vagrant", :nfs => true, id: "vagrant-root"
+  config.vm.synced_folder "../../DDPS-fastetmon", "/DDPS-fastetmon", :nfs => true, id: "vagrant-src"
+  config.vm.box = "freebsd/FreeBSD-11.1-RELEASE"
+  config.ssh.shell = "sh"
+  config.vm.network "private_network", ip: "10.200.1.10" # some IP from unused subnet
+  config.vm.base_mac = "080027D14C66"
+
+  config.vm.provider :virtualbox do |vb|
+    vb.customize ["modifyvm", :id, "--memory", "1024"]
+    vb.customize ["modifyvm", :id, "--cpus", "1"]
+    vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+    vb.customize ["modifyvm", :id, "--audio", "none"]
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+  end
+
+  config.vm.box_check_update = true
+  config.vm.provision "shell", path: "provision.sh", args: ENV['SHELL_ARGS']
+end

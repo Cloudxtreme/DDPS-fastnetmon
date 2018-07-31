@@ -1,0 +1,107 @@
+13:05:55 (12/01) Begin
+13:05:55 (12/01) called as: ./remote.sh -v make runinstall
+13:05:55 (12/01) Environment:
+13:05:55 (12/01) git_sha:        '9eafd4f09140fb8deb478a7dffdb671642560bf8'
+13:05:55 (12/01) build_date:     '2018-01-12 13:05'
+13:05:55 (12/01) TARGETHOST:     'root@fnm-dev.deic.dk'
+13:05:55 (12/01) UPLOADDIR:      'src-i2dps'
+13:05:55 (12/01) EXCLUDE_FILE:   'rsync_exclude.txt'
+13:05:55 (12/01) TMPDIR:         '/var/folders/2d/n362xj9148lg_rrsgy61wsjr0008qx/T/'
+13:05:55 (12/01) RRSYNC:         '/usr/bin/rsync'
+13:05:55 (12/01) LRSYNC:         '/usr/bin/rsync'
+13:05:55 (12/01) RSYNC_ARGS:     '-avzH --exclude-from=rsync_exclude.txt'
+13:05:55 (12/01) SSH_ARGS:       '-Tq -o LogLevel=error'
+13:05:55 (12/01) SSH:            '/usr/bin/ssh'
+13:05:55 (12/01) SRCDIR:         '.'
+13:05:55 (12/01) PROJDIR:        '../../DDPS-fastetmon'
+13:05:55 (12/01) MYDIR:          '/Users/uninth/ownsky/src/github/DDPS-fastetmon/src'
+13:05:55 (12/01) rsync files to root@fnm-dev.deic.dk ... 
+13:05:55 (12/01) command: /usr/bin/rsync -avzH --exclude-from=rsync_exclude.txt --rsync-path /usr/bin/rsync /Users/uninth/ownsky/src/github/DDPS-fastetmon/src/ root@fnm-dev.deic.dk:src-i2dps/
+13:05:55 (12/01) building file list ... done
+13:05:55 (12/01) ./
+13:05:55 (12/01) .source_info
+13:05:55 (12/01) fnm2db
+
+13:05:55 (12/01) sent 1057 bytes  received 262 bytes  2638.00 bytes/sec
+13:05:55 (12/01) total size is 110576  speedup is 83.83
+13:05:55 (12/01) exec 'make  runinstall' on root@fnm-dev.deic.dk ... 
+13:05:55 (12/01) mesg: ttyname failed: Inappropriate ioctl for device
+13:05:55 (12/01) /root/src-i2dps
+13:05:55 (12/01) made fnm2db in /opt/i2dps/bin
+13:05:55 (12/01) made setup.sh in /opt/i2dps/lib
+13:05:55 (12/01) new /opt/i2dps/etc/fnm2db.ini
+13:05:55 (12/01) installed id_ed25519.pub id_ed25519 in /opt/i2dps/etc/ssh
+13:05:55 (12/01) Reading package lists...
+13:05:55 (12/01) Building dependency tree...
+13:05:55 (12/01) Reading state information...
+13:05:55 (12/01) The following additional packages will be installed:
+13:05:55 (12/01) libio-pty-perl libnet-openssh-perl libnet-sftp-foreign-perl
+13:05:55 (12/01) Suggested packages:
+13:05:55 (12/01) libnet-openssh-gateway-perl
+13:05:55 (12/01) The following NEW packages will be installed:
+13:05:55 (12/01) libio-pty-perl libnet-openssh-compat-perl libnet-openssh-perl
+13:05:55 (12/01) libnet-sftp-foreign-perl
+13:05:55 (12/01) debconf: unable to initialize frontend: Dialog
+13:05:55 (12/01) debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+13:05:55 (12/01) debconf: falling back to frontend: Readline
+13:05:55 (12/01) debconf: unable to initialize frontend: Readline
+13:05:55 (12/01) debconf: (This frontend requires a controlling tty.)
+13:05:55 (12/01) debconf: falling back to frontend: Teletype
+13:05:55 (12/01) dpkg-preconfigure: unable to re-open stdin:
+13:05:55 (12/01) 0 upgraded, 4 newly installed, 0 to remove and 0 not upgraded.
+13:05:55 (12/01) Need to get 0 B/271 kB of archives.
+13:05:55 (12/01) After this operation, 813 kB of additional disk space will be used.
+13:05:55 (12/01) Selecting previously unselected package libio-pty-perl.
+13:05:55 (12/01) (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 86047 files and directories currently installed.)
+13:05:55 (12/01) Preparing to unpack .../libio-pty-perl_1%3a1.08-1.1+b4_amd64.deb ...
+13:05:55 (12/01) Unpacking libio-pty-perl (1:1.08-1.1+b4) ...
+13:05:55 (12/01) Selecting previously unselected package libnet-openssh-perl.
+13:05:55 (12/01) Preparing to unpack .../libnet-openssh-perl_0.74-1_all.deb ...
+13:05:55 (12/01) Unpacking libnet-openssh-perl (0.74-1) ...
+13:05:55 (12/01) Selecting previously unselected package libnet-sftp-foreign-perl.
+13:05:55 (12/01) Preparing to unpack .../libnet-sftp-foreign-perl_1.86+dfsg-1_all.deb ...
+13:05:55 (12/01) Unpacking libnet-sftp-foreign-perl (1.86+dfsg-1) ...
+13:05:55 (12/01) Selecting previously unselected package libnet-openssh-compat-perl.
+13:05:55 (12/01) Preparing to unpack .../libnet-openssh-compat-perl_0.09-1_all.deb ...
+13:05:55 (12/01) Unpacking libnet-openssh-compat-perl (0.09-1) ...
+13:05:55 (12/01) Setting up libnet-openssh-perl (0.74-1) ...
+13:05:55 (12/01) Setting up libio-pty-perl (1:1.08-1.1+b4) ...
+13:05:55 (12/01) Setting up libnet-sftp-foreign-perl (1.86+dfsg-1) ...
+13:05:55 (12/01) Setting up libnet-openssh-compat-perl (0.09-1) ...
+13:05:55 (12/01) Processing triggers for man-db (2.7.6.1-4) ...
+13:05:55 (12/01) allready installed: libnet-openssh-compat-perl
+13:05:55 (12/01) Reading package lists...
+13:05:55 (12/01) Building dependency tree...
+13:05:55 (12/01) Reading state information...
+13:05:55 (12/01) The following additional packages will be installed:
+13:05:55 (12/01) libterm-readkey-perl
+13:05:55 (12/01) The following NEW packages will be installed:
+13:05:55 (12/01) libnet-ssh2-perl libterm-readkey-perl
+13:05:55 (12/01) debconf: unable to initialize frontend: Dialog
+13:05:55 (12/01) debconf: (Dialog frontend will not work on a dumb terminal, an emacs shell buffer, or without a controlling terminal.)
+13:05:55 (12/01) debconf: falling back to frontend: Readline
+13:05:55 (12/01) debconf: unable to initialize frontend: Readline
+13:05:55 (12/01) debconf: (This frontend requires a controlling tty.)
+13:05:55 (12/01) debconf: falling back to frontend: Teletype
+13:05:55 (12/01) dpkg-preconfigure: unable to re-open stdin:
+13:05:55 (12/01) 0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+13:05:55 (12/01) Need to get 0 B/137 kB of archives.
+13:05:55 (12/01) After this operation, 384 kB of additional disk space will be used.
+13:05:55 (12/01) Selecting previously unselected package libnet-ssh2-perl.
+13:05:55 (12/01) (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 86156 files and directories currently installed.)
+13:05:55 (12/01) Preparing to unpack .../libnet-ssh2-perl_0.68-1_amd64.deb ...
+13:05:55 (12/01) Unpacking libnet-ssh2-perl (0.68-1) ...
+13:05:55 (12/01) Selecting previously unselected package libterm-readkey-perl.
+13:05:55 (12/01) Preparing to unpack .../libterm-readkey-perl_2.37-1+b2_amd64.deb ...
+13:05:55 (12/01) Unpacking libterm-readkey-perl (2.37-1+b2) ...
+13:05:55 (12/01) Setting up libterm-readkey-perl (2.37-1+b2) ...
+13:05:55 (12/01) Processing triggers for man-db (2.7.6.1-4) ...
+13:05:55 (12/01) Setting up libnet-ssh2-perl (0.68-1) ...
+13:05:55 (12/01) allready installed: libnet-sftp-foreign-perl
+13:05:55 (12/01) version:       1.0-17
+13:05:55 (12/01) build date:    2017-07-31 15:18
+13:05:55 (12/01) build_git_sha: c89565231f1afa70dce04a206e965868a1614e63
+13:05:55 (12/01) inicfg:        /opt/i2dps/etc/fnm2db.ini
+13:05:55 (12/01) This version only handles IPv4 by design
+13:05:55 (12/01) installation ok
+13:05:58 (12/01) done

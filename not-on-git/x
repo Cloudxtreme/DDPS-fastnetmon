@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# fastnetmon.conf -> shell env vars
+
+awk -F'=' '
+    $1 ~ /#/    { print "putte"; next }
+    $0 ~ /^$/   { print "putte"; next }
+    $0 ~ /=/ 
+    {
+         gsub(/ /, "", $1);
+         gsub(/#/, "", $1);
+         gsub(":", "", $1); 
+         gsub(/ /, "", $2); 
+
+         print  "export " $1 "=" $2;
+         next;
+     }
+' fastnetmon.conf.tmpl
+
+exit 0
+
+#eval `cat fastnetmon.conf.tmpl | awk -F'=' '
+#    $0 ~ /=/  { gsub (/ /, "", $1); gsub(/#/, "", $1); print  "export " $1 " = ${" $1 "}" ; next }
+#    { print; next }
+#'`
+
+# osx: go get github.com/ilkka/substenv, rename to envsubst

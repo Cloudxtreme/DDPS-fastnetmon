@@ -1,0 +1,98 @@
+:
+
+IMPORT="import.sql"
+IMPORTSH="import.sql.SH"
+
+TMPEXPORT="tmp_export.SH"
+
+SCHEMA="schema.sql"
+
+TMPFILE=/tmp/$$.tmp
+
+FILES="fastnetmon.conf fnm2db.ini rc.conf"
+ALLFILES="${FILES} networks_list networks_whitelist"
+
+for F in ${ALLFILES}
+do
+    test -f $F || {
+        echo "file $F missing"
+    }
+done
+
+
+# extract var=value from all files
+
+(
+for FILE in ${FILES}
+do
+    if [ -f ${FILE} ]; then
+
+        awk -F'=' ' 
+            $0 !~ /=/ { next;};
+            $1 ~ /#/ { next;};
+            {
+                gsub(/.*:/, "", $1)     # remove:part from fastnetmon vars
+                gsub(/[\t ]*/, "", $1)
+                gsub(/[\t ]*/, "", $2)
+                printf("export %s='%s'\n", $1, $2)
+            }
+            ' ${FILE}
+    fi
+done
+) >> ${TMPFILE}
+
+# extract networks_list and networks_whitelist
+networks_whitelist=`cat networks_whitelist`
+networks_whitelist="`echo ${networks_whitelist}`" # remove \n
+
+echo "export networks_list=`cat networks_list`" >> ${TMPFILE}
+echo "export networks_whitelist=$networks_whitelist" >> ${TMPFILE}
+
+# fix var=value value -> var='value value'
+
+sed "
+    s/=/='/
+    s/$/'/
+" ${TMPFILE} > ${TMPEXPORT}
+
+# TODO - part of script
+SEARCH="hostname"
+QUERY="fnm.deic.dk"
+
+cat << EOF >> ${TMPEXPORT}
+export SEARCH="${SEARCH}"
+export QUERY="${QUERY}"
+EOF
+
+# design bummer:
+# dump schema to sql template - not possible as some vars are not identical as value in db
+# while other var=value in config should not be added to db
+# so use a crafted template ${IMPORTSH} instead
+#
+# change uuid_fastnetmoninstanceid to fastnetmoninstanceid
+# change uuid_customerid to customerid
+# change uuid_administratorid to administratorid
+#
+# (
+#     echo "UPDATE flow.fastnetmoninstances"
+#     echo "    SET "
+#     head -n -1 ${SCHEMA}    | awk "{ print \"    \" \$1 \" = '\$\" \$1 \"',\" }"     # all but last line
+#     tail -1 ${SCHEMA}       | awk "{ print \"    \" \$1 \" = '\$\" \$1 \"'\" }"      # no , on last line
+#     echo "WHERE \${SEARCH} = '\${QUERY}';"
+# ) > ${IMPORTSH}
+
+# # source TMPEXPORT and expand
+(
+    . ${TMPEXPORT}
+    envsubst < ${IMPORTSH} > ${IMPORT}
+) 
+
+# TODO:
+# check no empty values in IMPORT
+
+sed 's/\(.*'\'''\''\)/    -- \1/g' $IMPORT > $TMPFILE; /bin/mv $TMPFILE $IMPORT
+
+tail ${TMPEXPORT}  ${IMPORT}
+
+exit 0
+

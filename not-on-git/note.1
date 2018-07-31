@@ -1,0 +1,72 @@
+
+# Nyinstallation / DDPS db til filer:
+
+På ww1.ddps eller ww2.ddps: opert ny FastNetMon host i DDPS GUI
+
+på fw.ddps
+
+    - lav OpenVPN og ssh nøgler
+
+på ww1/ww2:
+
+    - mkdir /tmp/config && cd /tmp/config
+    - fnm-db-export -n hostname
+      laver env + conf. filer (influxd.conf, fastnetmon.conf, networks_whitelist, networks_list og fnm2db.ini)
+    
+Flyt OpenVPN og ssh nøgle til . og installer i auth.keys
+
+så af push2fnm -d dir -i ipaddr init
+    push2fnm skal
+    - lave en rsync af dir -> ipaddr
+    - ssh root@dir
+    - hvis init så finde 2 interfaces og bygge rc.conf samt kopiere
+      influxd.conf på plads
+    - flytte fastnetmon.conf, fnm2db.ini, networks_list og networks_whitelist
+      på plads
+    - start/genstart fastnetmon og influxd
+
+## Ændringer via GUI / db:
+    - periodisk kørsel / on-demand ?
+    - mkdir ...
+    - cp ...
+    - cfg2SH_and_tmpl.pl    (laver både env.SH + tmpl filer - env.SH anvendes
+                             ikke her)
+    - envsubst ...
+    - push2fnm ... update
+      - opdater *ikke* rc.conf, OpenVPN eller ssh men alt andet
+    - start/genstart fastnetmon og influxd
+
+## Opdatering fra filer til db:
+
+på ww1/ww2:
+
+    - mkdir /tmp/conf && cd /tmp/conf
+    - fnm2db -d dir -i ipaddr
+      - hent alle config filer
+      - cfg2SH_and_tmpl.pl (tmpl filer anvendes ikke kun env.SH)
+      - SH2db.pl 
+        - opret fnm hvis den ikke findes, ellers opdater tabel med nye værdier
+
+Mangler:
+    - push2fnm - meget kan genbruges fra postbootstrap.sh
+    - SH2db.pl - evt. skrives i bash
+    - tests
+
+note:
+    - sql ting bør hente pw i /opt/db2dps/etc/ ... .ini
+    - scripts der skal udføres på ddps bør installeres fra ~/src og uden
+      extension, de resikerer at skulle skrives om.
+
+
+Hvordan ønsker vi at
+
+    - tilføje nye fnm til databasen?
+    - importere eksisterende konfigurationer i databasen?
+    - eksportere database konfigurationer til filer?
+    - kopiere filer til host?
+    - hente filer fra host?
+    - integrere med web-gui?
+
+Add, import/export/edit, push, fetch
+
+update flow.fastnetmoninstances set networks_whitelist = '130.225.245.208/29 130.225.242.200/29' where hostname = 'fnm.deic.dk';

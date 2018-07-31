@@ -1,0 +1,15 @@
+[Unit]
+Description=Regular background program processing daemon
+After=syslog.target network.target postgresql.service
+
+[Service]
+Type=simple
+ExecStart=/opt/db2dps/etc/init.d/db2fnm start
+ExecStop=/opt/db2dps/etc/init.d/db2fnm stop
+
+ExecReload=/opt/db2dps/etc/init.d/db2fnm reload
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,352 @@
+# This file is used with bsdinstall(8) and loaded into a FreeBSD .iso in /etc.
+# We then create a custom FreeBSD ISO, with the following specifications. All
+# automated and without user intervention.
+
+# 1. PREAMBLE. First define variables bsdinstall(8) needs
+
+## Distribution files to install
+DISTRIBUTIONS="kernel.txz base.txz"
+
+## Variations in root disk device
+if [ -e /dev/ada0 ]; then
+  DISKSLICE=ada0
+elif [ -e /dev/da0 ]; then
+  DISKSLICE=da0
+elif [ -e /dev/vtbd0 ]; then
+  DISKSLICE=vtbd0
+else
+  echo "Unknown disk device"
+  exit -1
+fi
+
+export ZFSBOOT_DISKS="$DISKSLICE"
+export ZFSBOOT_CONFIRM_LAYOUT=0
+
+## Dont run interactive for ZFS setup
+export nonInteractive="YES"
+
+
+# 2. SETUP SCRIPT. After variables are defined - scripting begins
+#!/bin/sh
+
+## /boot/loader.conf - configurations
+cat <<EOF >> /boot/loader.conf
+autoboot_delay=3
+verbose_loading="YES"
+hw.usb.disable_enumeration=1
+hw.usb.no_boot_wait=1
+hw.usb.no_shutdown_wait=1
+EOF
+
+
+## /etc/rc.conf - configurations
+cat <<EOF >> /etc/rc.conf
+hostname="bootstrapped"
+keymap="dk"
+ifconfig_DEFAULT="SYNCDHCP"
+openvpn_enable="YES"
+openvpn_configfile="/usr/local/etc/openvpn/openvpn.conf"
+sshd_enable="YES"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+sendmail_enable="NONE"
+dumpdev="NO"
+EOF
+
+## Set Time Zone to CET (CPH)
+/usr/sbin/tzsetup Europe/Copenhagen
+
+## Create the folders in /usr/local/etcd
+mkdir -p /usr/local/etc/openvpn
+mkdir -p /usr/local/etc/rc.d
+chmod 755 /usr/local/etc/rc.d
+chmod 755 /usr/local/etc/openvpn
+
+
+## Create a first time boot setup script that runs only once,
+## after a successful installation with the custom ISO.
+cat <<EOF > /usr/local/etc/rc.d/rc.firsttime.sh
+# REQUIRE: NETWORKING
+# BEFORE: LOGIN
+
+# FreeBSD RELEASE updates
+env PAGER=cat freebsd-update fetch
+env PAGER=cat freebsd-update install
+
+# Update packages
+env ASSUME_ALWAYS_YES=YES pkg update -f
+env ASSUME_ALWAYS_YES=YES pkg upgrade -q -y
+
+# Install packages
+env ASSUME_ALWAYS_YES=YES pkg install -q -y openvpn
+
+# Clean packages
+env ASSUME_ALWAYS_YES=YES pkg autoremove
+env ASSUME_ALWAYS_YES=YES pkg clean -a
+
+# Remove the script after first run
+/bin/rm -rf /usr/local/etc/rc.d/rc.firsttime.sh
+/sbin/reboot
+
+exit 0
+EOF
+
+
+## Setup OpenVPN client configuration
+cat <<EOF > /usr/local/etc/openvpn/openvpn.conf
+##############################################
+# This configuration can be used by multiple #
+# clients, however each client should have   #
+# its own cert and key files.                #
+##############################################
+
+# Specify that we are a client and that we
+# will be pulling certain config file directives
+# from the server.
+client
+
+# Use the same setting as you are using on
+# the server.
+# On most systems, the VPN will not function
+# unless you partially or fully disable
+# the firewall for the TUN/TAP interface.
+dev tun
+
+# Are we connecting to a TCP or
+# UDP server?  Use the same setting as
+# on the server.
+proto udp
+
+# The hostname/IP and port of the server.
+# You can have multiple remote entries
+# to load balance between the servers.
+remote 130.225.242.202 1194
+
+# Route all traffic through the VPN.
+redirect-gateway
+
+# Select a cryptographic cipher.
+# This config item must be copied to
+# the client config file as well.
+# Note that 2.4 client/server will automatically
+# negotiate AES-256-GCM in TLS mode.
+# See also the ncp-cipher option in the manpage
+cipher AES-128-CBC
+auth SHA1
+
+# Keep trying indefinitely to resolve the
+# host name of the OpenVPN server.  Very useful
+# on machines which are not permanently connected
+# to the internet such as laptops.
+resolv-retry infinite
+
+# Most clients don't need to bind to
+# a specific local port number.
+nobind
+
+# Try to preserve some state across restarts.
+persist-key
+persist-tun
+
+# If you are connecting through an
+# HTTP proxy to reach the actual OpenVPN
+# server, put the proxy server/IP and
+# port number here.  See the man page
+# if your proxy server requires
+# authentication.
+;http-proxy-retry # retry on connection failures
+;http-proxy [proxy server] [proxy port #]
+
+# Wireless networks often produce a lot
+# of duplicate packets.  Set this flag
+# to silence duplicate packet warnings.
+mute-replay-warnings
+
+# Verify server certificate by checking that the
+# certicate has the correct key usage set.
+# This is an important precaution to protect against
+# a potential attack discussed here:
+#  http://openvpn.net/howto.html#mitm
+remote-cert-tls server
+
+# Compression.
+;comp-lzo
+
+# Set log file verbosity.
+verb 3
+
+# Silence repeating messages.
+mute 20
+
+# Keydirection for embedded keys.
+key-direction 1
+
+# Inline certificates and keys below.
+
+<tls-auth>
+#
+# 2048 bit OpenVPN static key
+#
+-----BEGIN OpenVPN Static key V1-----
+e744912e9c1799ccd059590729167788
+363718f494ae4ff35fdb52e6dd2f2baf
+23ff3d3332a1e0740e948e97fcd1b67b
+32f21968cac8398ce400c4285392dbf3
+4dd5cf75b754021b8a18642af682cb24
+72679da78fe800e003d41d40a92268d2
+3ede885c252b6f723d3b4616ba8b7f17
+0a511def09ea318340d07f6f2599bc7f
+2ad37d737d0da74e4774e7427b80e80e
+0c638dbeb515ba2749dcc93ea386f0e5
+f852ad7ecfc0b4e16b0eeb89b4288071
+bfaf2778f0e0b20f78a4b8f36b068249
+528411fe09d33874d1486b54f496de57
+c9db99d56ffe72dc02517f5174d3ce31
+7d5d8c58f14b80d109e394b9518c6653
+9cbb71d9d2e39809f2308ac3186b73a3
+-----END OpenVPN Static key V1-----
+</tls-auth>
+<ca>
+-----BEGIN CERTIFICATE-----
+MIIDQTCCAimgAwIBAgIJAJ1klYLNOdCvMA0GCSqGSIb3DQEBCwUAMBoxGDAWBgNV
+BAMMD0REUFMuREVJQy5ESyBDQTAeFw0xNzA5MDgxMTE1NDFaFw0yNzA5MDYxMTE1
+NDFaMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQTCCASIwDQYJKoZIhvcNAQEB
+BQADggEPADCCAQoCggEBAMoC6IipqHwe0Cc2BFJ5JIG6y3wosn1HfQ9HLC821XPh
+xhR7sJwXxDAPbTYRkCciFexZhaxKsx9bXjwlYK2X6kh1HWosrBNVXrclUzbL4l4+
+rrdWRJTHZDfX0iJIAbB8J/bpdpS7uxxTevg8yrHPLn8DVR5pQUB23XlpWbPs08Bu
+oxo/M52gfVG4P2X57U1dSxefBX6zl7yv6+sqabPRstzoxeYoksqQl5l0pWdhTKOU
+0byI1gQHLezrCKePatGglBTF610lFcsH8PHfzgp3JLAdiwVixqParwgd8OwwXgY3
+FcyRsOCm6w+xkjMPPzwnyUxDpJ+gyf0OcNePoti5U20CAwEAAaOBiTCBhjAdBgNV
+HQ4EFgQUT8cBE8+x+oJuqrW2RDXVsYnVO50wSgYDVR0jBEMwQYAUT8cBE8+x+oJu
+qrW2RDXVsYnVO52hHqQcMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQYIJAJ1k
+lYLNOdCvMAwGA1UdEwQFMAMBAf8wCwYDVR0PBAQDAgEGMA0GCSqGSIb3DQEBCwUA
+A4IBAQCPIrHjXTysLIQPFLOQTo5KcOKckcN9leymcQ+5UtsX+g5kGka2+Z81Jl4A
+jRlAx4ca6wu2EjoDkvJzDKRr0SLHg6v25XRYxs2UQi16VjjcGmvgGySwQ7oO1Iom
+MmClOgIz70A0jpphqDtmmdZy1Ca02OSqNRppljRM/DIhhIIc5R57A0w5H0HdrHm6
+Hcz1Y3O1MCK53DRrnJO1OtsJ30DR6nJ4UBhE6yfRhspqdITUCnrqK2GyvdMF9V+7
+sv9wOIN9w2ssS3LiDO/p1WJWRo6Pl8HaDchkUHt3yW6rCQwZYo1dhufjBzcJOFcX
+47DPcxs9ChRLA39Fa5dSYnIB7ZpE
+-----END CERTIFICATE-----
+</ca>
+<cert>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 20 (0x14)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN=DDPS.DEIC.DK CA
+        Validity
+            Not Before: Feb 22 11:55:28 2018 GMT
+            Not After : Feb 20 11:55:28 2028 GMT
+        Subject: CN=bootstrapped
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:cd:28:1f:c4:74:63:31:7e:a0:a4:47:1f:67:86:
+                    87:6b:47:30:25:91:76:a9:61:de:d3:9a:fc:93:5e:
+                    58:93:9a:b0:c1:4e:21:a2:87:e0:f0:6e:dd:8b:1e:
+                    38:0a:f2:97:7c:9b:5a:74:6e:66:2d:9f:43:f4:d7:
+                    35:34:a1:97:b8:59:26:00:85:9e:e7:c2:ee:ac:07:
+                    46:93:cd:eb:55:e9:e7:da:9b:e1:da:95:9a:99:a2:
+                    63:5f:cf:bb:3e:d3:96:f6:51:e1:44:2f:c7:c0:05:
+                    73:13:f0:5f:2e:4e:17:f1:dc:b1:4d:dd:0c:c6:c4:
+                    0d:95:b7:fa:fd:7b:69:f6:2a:fe:9a:17:b2:ff:2b:
+                    b2:35:a4:ea:4d:95:3d:57:64:c0:4b:3e:7f:5e:34:
+                    33:4b:cd:c8:f4:01:2b:77:08:c5:d9:df:ba:aa:b2:
+                    4c:23:db:04:e5:eb:53:94:b3:ae:dc:3a:84:df:c8:
+                    78:34:ec:91:75:4d:1b:e9:65:df:d8:bf:a0:95:0a:
+                    9d:ca:b1:68:59:6a:5a:b1:e2:9f:0b:f4:0d:4c:cd:
+                    70:bb:cb:e8:77:53:eb:57:d4:98:7f:d9:a9:a4:3b:
+                    8e:e4:55:65:0e:8b:1f:85:8c:da:c1:bc:eb:c8:22:
+                    39:47:ad:9e:9f:7f:2b:36:d6:40:00:68:d2:f6:1f:
+                    d5:43
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints:
+                CA:FALSE
+            X509v3 Subject Key Identifier:
+                47:3B:1E:39:7F:6F:08:70:22:EE:2C:4A:AE:11:B7:DB:A2:D1:4A:76
+            X509v3 Authority Key Identifier:
+                keyid:4F:C7:01:13:CF:B1:FA:82:6E:AA:B5:B6:44:35:D5:B1:89:D5:3B:9D
+                DirName:/CN=DDPS.DEIC.DK CA
+                serial:9D:64:95:82:CD:39:D0:AF
+
+            X509v3 Extended Key Usage:
+                TLS Web Client Authentication
+            X509v3 Key Usage:
+                Digital Signature
+    Signature Algorithm: sha256WithRSAEncryption
+         8a:cc:4f:a5:3c:b9:94:d5:6f:91:fe:c7:c1:e4:13:ff:e6:00:
+         09:e6:9e:2c:5b:99:5d:d5:57:6d:90:77:0f:34:1e:d6:c0:cb:
+         6c:e1:ff:f4:42:c4:23:db:9b:6c:6f:26:9e:ff:c8:9e:a6:76:
+         40:cf:38:85:23:6d:1d:bf:5d:52:37:8d:81:da:02:11:02:7b:
+         59:46:5c:59:6e:0e:f2:fc:f7:ee:8b:2c:90:3c:dc:02:9a:2d:
+         25:dd:49:db:b1:ba:d9:a6:02:68:2b:e0:83:8f:0a:45:a7:b7:
+         5e:ae:a0:60:26:06:3f:a1:0a:35:5e:de:2d:32:b5:30:a0:2b:
+         40:6f:9c:7e:7f:bf:96:43:26:3f:09:fc:6d:c0:93:2d:4a:01:
+         27:42:b8:3b:5d:36:a9:47:d4:f8:9d:1f:f6:04:6b:6f:67:b4:
+         a5:6a:0f:c6:3b:bf:3e:26:1a:60:e3:3a:dc:df:e4:a9:0e:85:
+         8f:a1:42:ce:87:66:dd:00:02:c9:50:08:89:5c:7e:34:0e:62:
+         2f:ee:e2:51:ab:13:b1:3b:df:ce:53:b6:d9:79:fb:81:44:19:
+         2f:1c:fd:7c:34:3d:f6:9a:a1:71:09:b2:b3:b1:50:59:af:a5:
+         c9:6b:19:ee:1d:61:1e:fa:3d:4e:e3:6d:45:9c:da:7a:2c:46:
+         c2:c6:d6:53
+-----BEGIN CERTIFICATE-----
+MIIDSDCCAjCgAwIBAgIBFDANBgkqhkiG9w0BAQsFADAaMRgwFgYDVQQDDA9ERFBT
+LkRFSUMuREsgQ0EwHhcNMTgwMjIyMTE1NTI4WhcNMjgwMjIwMTE1NTI4WjAXMRUw
+EwYDVQQDDAxib290c3RyYXBwZWQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDNKB/EdGMxfqCkRx9nhodrRzAlkXapYd7TmvyTXliTmrDBTiGih+Dwbt2L
+HjgK8pd8m1p0bmYtn0P01zU0oZe4WSYAhZ7nwu6sB0aTzetV6efam+HalZqZomNf
+z7s+05b2UeFEL8fABXMT8F8uThfx3LFN3QzGxA2Vt/r9e2n2Kv6aF7L/K7I1pOpN
+lT1XZMBLPn9eNDNLzcj0ASt3CMXZ37qqskwj2wTl61OUs67cOoTfyHg07JF1TRvp
+Zd/Yv6CVCp3KsWhZalqx4p8L9A1MzXC7y+h3U+tX1Jh/2amkO47kVWUOix+FjNrB
+vOvIIjlHrZ6ffys21kAAaNL2H9VDAgMBAAGjgZswgZgwCQYDVR0TBAIwADAdBgNV
+HQ4EFgQURzseOX9vCHAi7ixKrhG326LRSnYwSgYDVR0jBEMwQYAUT8cBE8+x+oJu
+qrW2RDXVsYnVO52hHqQcMBoxGDAWBgNVBAMMD0REUFMuREVJQy5ESyBDQYIJAJ1k
+lYLNOdCvMBMGA1UdJQQMMAoGCCsGAQUFBwMCMAsGA1UdDwQEAwIHgDANBgkqhkiG
+9w0BAQsFAAOCAQEAisxPpTy5lNVvkf7HweQT/+YACeaeLFuZXdVXbZB3DzQe1sDL
+bOH/9ELEI9ubbG8mnv/InqZ2QM84hSNtHb9dUjeNgdoCEQJ7WUZcWW4O8vz37oss
+kDzcApotJd1J27G62aYCaCvgg48KRae3Xq6gYCYGP6EKNV7eLTK1MKArQG+cfn+/
+lkMmPwn8bcCTLUoBJ0K4O102qUfU+J0f9gRrb2e0pWoPxju/PiYaYOM63N/kqQ6F
+j6FCzodm3QACyVAIiVx+NA5iL+7iUasTsTvfzlO22Xn7gUQZLxz9fDQ99pqhcQmy
+s7FQWa+lyWsZ7h1hHvo9TuNtRZzaeixGwsbWUw==
+-----END CERTIFICATE-----
+</cert>
+<key>
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDNKB/EdGMxfqCk
+Rx9nhodrRzAlkXapYd7TmvyTXliTmrDBTiGih+Dwbt2LHjgK8pd8m1p0bmYtn0P0
+1zU0oZe4WSYAhZ7nwu6sB0aTzetV6efam+HalZqZomNfz7s+05b2UeFEL8fABXMT
+8F8uThfx3LFN3QzGxA2Vt/r9e2n2Kv6aF7L/K7I1pOpNlT1XZMBLPn9eNDNLzcj0
+ASt3CMXZ37qqskwj2wTl61OUs67cOoTfyHg07JF1TRvpZd/Yv6CVCp3KsWhZalqx
+4p8L9A1MzXC7y+h3U+tX1Jh/2amkO47kVWUOix+FjNrBvOvIIjlHrZ6ffys21kAA
+aNL2H9VDAgMBAAECggEAAT7zInBKgexw8U51RF2uyNn/0tqVS+YKQmK4kfSKuSrB
+VAszbRdCKHOj6MpgMMDUZq9S104sVK6Y7Q25hv5MO5RfBLXLB0FJzcWlihRAD5+C
+BvPXZUpvS+uOivBqBLGoQwqwQYfAwMvHrSFSkqdqwc9DTGPBRhu+sWASqCNtu074
+vxBHryPShK96Inxwv4OsccBq6XB395RDx4zDvXkCLlv25Y/B4iYDCgXU4i/ueE2n
+HVXnmfY3fpXF2+mklNl3rCXjTMaAFiZGv3lq8jN6pMc1sShrSg1M2RViZ/4qIDjH
+uD/7OvgXVusKpOLTNZwBcwFwUwp+LSdzBYCv3FLOMQKBgQDy6DgLx74M4KtO6Xam
+wEVL/0SUV6gLG+IcOM9fnNYlVDf7dS1mMv0VpsUizNbVL3jKrZ8jymHK6fYG/wRY
+zDVHEwa2HggJaRmjsuC8iddHm3aK+l0L+Pus1M/MZaEF5gNzKzq4rWc4pxLBJqjx
+MycWZpLxjmdBz6fJQCaUxE31zQKBgQDYNwCelafBTou7k1j4Y2TyvKC6O7CPEi77
+UqS+1dtfUhq3y5xpN7AlQSl3hbr6+JPKSKleyyQ18rnZ8SIsrplze92qyRdzGoi9
+lrMkXIhKB5/r84hNZYX6FYXEyM8TagSwSWB5mOSrC0HHUhfG2GFesO9eSSu2LD8T
+FVnO6VnnTwKBgQDQfFQueEA82VDvqB54vSo9MlnwYNQQxNvrkS8cR4bd/00VfNt8
+jmL/BGbLmbkCvX4Vp7OhioEpImpSUuuuM4e++yuVgG0xdo3VHSEbccve4CZ83qqi
+LhAFpZq9OrVcVLG9VetOuzaPP4cvVTlH3Lm91khlH+6sY8kFSRRUN7EaOQKBgQDS
+dufhdqfvITgfhNTMJGR1bGvAHK5G9lpJRi8bnCyIYvGjC03bldueyAlHUSOrfSDP
+fV9w6Kj84qNKpNCxUdwJb/9caZar8p48fl8u++umtDlVgp+hRzvdLeoinZ4EteSO
+fT6t3shoPvLuxNhkNOjDNdQroWotUHCtcNEU+k0LPQKBgQC3246RPA6yTIgSKOud
+GBDDcNGWlLo0Jl78DAhERG/IkDNEA5jU+EcvGIvxu1j9+TMHyjOL6Clg8MooI6GB
+1sThziSkBFx/QymUbJ8K/ahekHiP2mQtn5ml6SoOrsucs5/45vcLINqhvGfeyFGK
+WWldle4vh+jWKXzGt6nMXaAz7g==
+-----END PRIVATE KEY-----
+</key>
+EOF
+
+## Make the first time script executable
+chmod 555 /usr/local/etc/rc.d/rc.firsttime.sh
+
+## Poweroff so we can remove install ISO (default is reboot)
+poweroff
