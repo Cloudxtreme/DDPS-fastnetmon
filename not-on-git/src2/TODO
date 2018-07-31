@@ -1,1 +1,0 @@
-STATUS for regler mv. skal laves færdig i fnmcfg; test ved fejl en gang til, ret subject + baggrund ved fejl i STATUS (awk -F':' $1 != ok)

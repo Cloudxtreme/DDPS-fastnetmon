@@ -1,8 +1,0 @@
-
-skal flyttes over og erstatte DDPS-fastnetmon, med et doc, src / vagrant
-katalog
-
-mk-freebsd.sh && Co skal stadig bo i src, mens alt det her skal bo i doc og
-vagrant.
-
-

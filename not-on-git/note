@@ -1,5 +1,0 @@
-
-If `vagrant up` fails with the error `OpenSSL SSL_read: SSL_ERROR_SYSCALL,
-errno 54` or similar, please use `vagrant --insecure --clean up` instead.
-(error caused on macOS High Sierra with LibreSSL 2.2.7).
-
